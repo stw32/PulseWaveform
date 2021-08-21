@@ -1,0 +1,954 @@
+############################################### Analysis Script:
+
+library(ggpubr)
+library(ggplot2)
+library(gtable)
+library(grid)
+library(gridExtra)
+library(tidyr)
+
+# Load in data and functions:
+setwd("/Users/simonwilliamson/Desktop/")
+load("/Users/simonwilliamson/Desktop/CombinedParticipants-2.RData")
+
+load("Desktop/CombinedParticipants-2.RData")
+source("~/Desktop/Scripts/PPG_funcs.R")
+source("~/Desktop/Scripts/iso_funcs.R")
+
+# Key:
+
+# [[i]][[1]] == beat_final
+# [[i]][[2]] == features       
+# [[i]][[3]] == fit_check      
+# [[i]][[4]] == osnd_fits
+# [[i]][[5]] == osnd_all
+# [[i]][[6]] == avWave
+# [[i]][[7]] == osnd (of average)
+# [[i]][[8]] == pulse
+# [[i]][[9]] == polyWave
+
+################################################# Contents:
+
+# Part 1: General Model Performance:
+  
+  # Goodness of Fit Assessment:
+     # Basic plotting
+     # Histograms
+
+  # Correlations of Component Waves with OSND features:
+     # A working version of rebuild
+     # Correlations of S, N, and D y-values to amplitudes of component waves
+     # Correlating PPT with D Time
+
+  # See also GGplotFits, in iso_funcs, which can be run on any time series in the main script to generate plots of fitted waves
+
+
+# Part 2: Characterization of a Pharmacological Manipulation:
+
+  # Average Waves at each dose level (with average of averages)
+    # 0 mcg
+    # 2 mcg
+    # Average of averaged waves superimposed
+
+  # Dose level comparison
+    # Violin plots of morphological features
+    # Violin plots of model parameters
+    # Alternative Morphological plots (using time series)
+    # Violin plots for IBI / HR / SDNN
+    # ROC curves
+      # ROC of morphology + HR + SDNN
+      # ROC for model2 features
+
+
+
+
+############################################################### Part 1: ################################################################
+
+####################################################### Goodness of Fit Assessment: ####################################################
+
+
+#################### Basic plots: x-axis = participants, y-axis = fit values, split by dose:
+
+# NRMSE:
+nrmsetwo <- c()
+nrmsezero <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  twomg <- c(AllOutputs[[i]][[1]][[3]][[3]], AllOutputs[[i]][[3]][[3]][[3]])
+  nrmsetwo[i] <- median(twomg)
+  zeromg <- c(AllOutputs[[i]][[2]][[3]][[3]], AllOutputs[[i]][[4]][[3]][[3]])
+  nrmsezero[i] <- median(zeromg)
+}
+plot(nrmsezero, t = "l")
+lines(nrmsetwo, col = "red")  
+# Get means:
+mean(nrmsezero[!is.na(nrmsezero)])
+mean(nrmsetwo[!is.na(nrmsetwo)])
+# 2mg waves have better nrmse values
+
+
+# aNRMSE:
+anrmsetwo <- c()
+anrmsezero <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  twomg <- c(AllOutputs[[i]][[1]][[3]][[4]], AllOutputs[[i]][[3]][[3]][[4]])
+  anrmsetwo[i] <- median(twomg)
+  zeromg <- c(AllOutputs[[i]][[2]][[3]][[4]], AllOutputs[[i]][[4]][[3]][[4]])
+  anrmsezero[i] <- median(zeromg)
+}
+plot(anrmsezero, t = "l")
+lines(anrmsetwo, col = "red")  
+# Get means:
+mean(anrmsezero[!is.na(anrmsezero)])
+mean(anrmsetwo[!is.na(anrmsetwo)])
+# 0mg have better aNRMSE values 
+
+# Now Max error:
+maxtwo <- c()
+maxzero <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  twomg <- c(AllOutputs[[i]][[1]][[3]][[2]], AllOutputs[[i]][[3]][[3]][[2]])
+  maxtwo[i] <- median(twomg)
+  zeromg <- c(AllOutputs[[i]][[2]][[3]][[2]], AllOutputs[[i]][[4]][[3]][[2]])
+  maxzero[i] <- median(zeromg)
+}
+plot(maxzero, t = "l")
+lines(maxtwo, col = "red")  
+# 2mg has better max error values
+
+# Finally, ChiSq:
+chitwo <- c()
+chizero <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  twomg <- c(AllOutputs[[i]][[1]][[3]][[1]], AllOutputs[[i]][[3]][[3]][[1]])
+  chitwo[i] <- median(twomg)
+  zeromg <- c(AllOutputs[[i]][[2]][[3]][[1]], AllOutputs[[i]][[4]][[3]][[1]])
+  chizero[i] <- median(zeromg)
+}
+plot(chizero, t = "l")
+lines(chitwo, col = "red")  
+# 2mg has better ChiSq values 
+
+# 2mg waves are better fitted by all meaures except for aNRMSE
+
+
+
+#################### Histograms of fits: x-axis = fit values, y-axis = frequency, split by dose:
+
+# Need to generate one big vector of all zero values:
+big_vector_zero <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  big_vector_zero <- c(big_vector_zero, nrmsezero[[i]])
+}
+a <- hist(big_vector_zero, breaks = 100, xlim = c(0, 1), col = "blue")
+# Now the same for 2mg:
+big_vector_two <- c()
+for(i in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[i]])){next}
+  big_vector_two <- c(big_vector_two, nrmsetwo[[i]])
+}
+b <- hist(big_vector_two, breaks = 40, xlim = c(0, 1), col = "red")
+# Get some transparent colours:
+c1 <- rgb(173,216,230,max = 255, alpha = 175, names = "lt.blue")
+c2 <- rgb(255,192,203, max = 255, alpha = 175, names = "lt.pink")
+# Now to combine them:
+plot(a, col = c1, xlim = c(0.5, 1), ylim = c(0, 4000), main = "NRMSE")
+plot(b, add = TRUE, col = c2)
+
+# Medians: 
+median(big_vector_zero)
+median(big_vector_two)
+# Means:
+mean(big_vector_zero)
+mean(big_vector_two)
+# Mean and median of all waves:
+mean(c(big_vector_zero, big_vector_two))
+median(c(big_vector_zero, big_vector_two))    # Overall median 0.9035844
+
+####################################################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+############################  Correlations of Component Waves with OSND features (+ a working version of Rebuild): ##################
+
+# A new  version of model2.rebuild, modified to find component wave heights (once decay has been added):
+
+# Note: Rebuilding with invert = FALSE will give similar values to output parameter ampltidues, indicating some robustness to the rebuilding
+
+model2.Rebuild3 <- function(xy,offset,params,invert=TRUE){
+  result <- 1:nrow(xy) * 0.0
+  # Find systolic height:
+  result <- result + model2.Peak(xy[,1],params[3:5])    
+  if (invert){
+    result <- model2.Excess.Inv2(xy[,1],result,offset,params[1],params[2],params[3]+1*params[6], config.rate = params[12])   
+  }
+  sys_height <- max(result)
+  # Find diastolic height:
+  result <- 1:nrow(xy) * 0.0
+  if (length(params)>=8){
+    result <- result + model2.Peak(xy[,1],params[6:8]+c(params[3],0,0))   # Diastolic parameters 
+  }
+  # Add decay:
+  if (invert){
+    result <- model2.Excess.Inv2(xy[,1],result,offset,params[1],params[2],params[3]+1*params[6], config.rate = params[12])   
+  }
+  dias_height <- max(result)    
+  # Finding R1 height:
+  result <- 1:nrow(xy) * 0.0
+  if (length(params)>=11){
+    result <- result + model2.Peak(xy[,1],params[9:11]+c(params[3],0,0))  # Renal parameters
+  }
+  if (invert){
+    result <- model2.Excess.Inv2(xy[,1],result,offset,params[1],params[2],params[3]+1*params[6], config.rate = params[12])   
+  }
+  R1_height <- max(result)
+  height <- c(sys_height,dias_height,R1_height)
+  return(height)
+}
+
+
+############################ Correlations of S, N, and D y-values to amplitudes of component waves
+
+# Building the vectors
+
+# Note: k = time series to run through, change this to 1, 3 or 2, 4 to assess 2 mcg or 0 mcg, respectively
+# Note: line to remove waves where values for N and D are equal are marked by comments: keep / remove as you wish
+
+# Component wave heights:
+real_heights_sys_twomg <- c()
+real_heights_dias_twomg <- c()
+real_heights_R1_twomg <- c()
+# Running through each participant:
+for(j in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[j]])){next}
+  # Running through each time series:
+  for(k in c(2, 4)){
+    # Running through every wave in a time series:
+    for(i in 1:nrow(AllOutputs[[j]][[k]][[1]])){
+      if(AllOutputs[[j]][[k]][[2]][i, 2] == AllOutputs[[j]][[k]][[2]][i, 3]){next}               # removing n == d waves
+      # Let's get the first data segment of the first participant:
+      wave <- AllOutputs[[j]][[k]][[8]][, (i+1)]
+      # Remove NAs:
+      wave <- wave[!is.na(wave)]
+      # Downsample:
+      wave <- wave[seq(from = 1, to = length(wave), length.out = length(wave) / 10)]
+      # Create dataframe:
+      xy <- data.frame(1:length(wave)/40)
+      xy <- cbind(xy, wave)
+      colnames(xy) <- c("time", "values")
+      # Now let's get the beat:
+      params <- as.double(AllOutputs[[j]][[k]][[1]][i, ])[-c(1:4)]
+      # adjust so systolic peak is timed correctly:
+      seg <- as.double(AllOutputs[[j]][[k]][[1]][i, 3:4])
+      time <- (seg[1]:seg[2])/40
+      dif <- length(time) - length(xy[, 1])
+      if(dif < 0){
+        xy <- xy[-(nrow(xy):nrow(xy) - (abs(dif)-1)), ]
+      }else{
+        time <- time[-(length(time):length(time) - (dif-1))]
+      }
+      xy[, 1] <- time
+      # Decide the offset:
+      lastdrop <- abs(wave[length(wave)] - wave[length(wave) - 1])
+      offset <- wave[1] + lastdrop 
+      # Get the component wave heights:
+      tmp <- model2.Rebuild3(xy,offset,params,invert=TRUE)
+      sys_a <- tmp[1]
+      R1_a <- tmp[3]
+      R2_a <- tmp[2]
+      print(tmp)
+      real_heights_sys_twomg <- c(real_heights_sys_twomg, sys_a)
+      real_heights_dias_twomg <- c(real_heights_dias_twomg, R2_a)
+      real_heights_R1_twomg <- c(real_heights_R1_twomg, R1_a)
+    }
+  }
+}
+
+# S, N and D heights:
+N_heights_twomg <- c()
+D_heights_twomg <- c()
+S_heights_twomg <- c()
+for(j in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[j]])){next}
+  for(k in c(2, 4)){
+    for(i in 1:nrow(AllOutputs[[j]][[k]][[1]])){
+      if(AllOutputs[[j]][[k]][[2]][i, 2] == AllOutputs[[j]][[k]][[2]][i, 3]){next}      # removing n == d waves
+      N_heights_twomg <- c(N_heights_twomg, AllOutputs[[j]][[k]][[2]][i, 2])   
+      D_heights_twomg <- c(D_heights_twomg, AllOutputs[[j]][[k]][[2]][i, 3])   
+      S_heights_twomg <- c(S_heights_twomg, AllOutputs[[j]][[k]][[2]][i, 1])   
+    }
+  }
+}
+
+# Correlating the vectors:
+
+# Model derived R1 height (y) to Notch height(x):
+plot(N_heights_twomg, real_heights_R1_twomg)
+abline(lm(real_heights_R1_twomg ~ N_heights_twomg))
+m <- lm(real_heights_R1_twomg ~ N_heights_twomg)
+summary(m)
+
+# Model derived R2 height (y) to D height (x):
+plot(D_heights_twomg, real_heights_dias_twomg)
+abline(lm(real_heights_dias_twomg ~ D_heights_twomg))
+m <- lm(real_heights_dias_twomg ~ D_heights_twomg)
+summary(m)
+
+#  Model derived Systolic height (y) to S height (x):
+plot(S_heights_twomg, real_heights_sys_twomg)
+abline(lm(real_heights_sys_twomg ~ S_heights_twomg))
+m <- lm(real_heights_sys_twomg ~ S_heights_twomg)
+summary(m)
+
+# So correlations not much better than before. 
+
+# Potential sources of variance weakening the correlation:
+# 1. Since both of the reflectance kernals are simply adding to the systolic decay that is already present, 
+#    the amplitude of the systolic decay at that point in time is another factor that influences the final height of the wave at that point.
+#    Basically, there are too many degrees of freedom to pin anything down to one thing. 
+# 2. The issues with notch fitting and wandering R1 wave at lower amplitudes that we know about already
+# 3. The renal wave most often precedes the notch, so only it's decay (which depends on config.rate) will contribute to notch height
+# 4. The model isn't constrained enough... even across-beat parameters within participants are shifting all over the place to get best fit
+
+
+
+############################## Correlating PPT with D Time: #############################
+
+ppt <- c()
+for(j in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[j]])){next}
+  for(k in c(2, 4)){
+    for(i in 1:nrow(AllOutputs[[j]][[k]][[2]])){
+      if(AllOutputs[[j]][[k]][[2]][i, 2] == AllOutputs[[j]][[k]][[2]][i, 3]){next}    # removing n == d waves
+      ppt <- c(ppt, AllOutputs[[j]][[k]][[2]][i, 5])   
+    }
+  }
+}
+
+ppt_model <- c()
+for(j in 1:length(AllOutputs)){
+  if(is.null(AllOutputs[[j]])){next}
+  for(k in c(2, 4)){
+    for(i in 1:nrow(AllOutputs[[j]][[k]][[1]])){
+      if(AllOutputs[[j]][[k]][[2]][i, 2] == AllOutputs[[j]][[k]][[2]][i, 3]){next}    # removing n == d waves
+      tmp <- AllOutputs[[j]][[k]][[1]][i, 10] 
+      ppt_model <- c(ppt_model, tmp)   
+    }
+  }
+}
+
+# Plot 
+plot(ppt, ppt_model)
+abline(lm(ppt_model ~ ppt))
+m <- lm(ppt_model ~ ppt)
+summary(m)
+
+
+########################################################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+############################################################### Part 2: ################################################################
+
+
+################################################ Average Waves at each dose level (with average of averages)  ##########################
+
+# Generate a dataframe (like 'pulse') for each dose level:
+avwavelengths0mg1 <- c()
+for(i in 1:112){
+  if(is.null(AllOutputs[[i]][[2]][[6]])){next}
+  avwavelengths0mg1[i] <- length(AllOutputs[[i]][[2]][[6]])
+}
+avwavelengths0mg2 <- c()
+for(i in 1:112){
+  if(is.null(AllOutputs[[i]][[4]][[6]])){next}
+  avwavelengths0mg2[i] <- length(AllOutputs[[i]][[4]][[6]])
+}
+avwavelengths2mg1 <- c()
+for(i in 1:112){
+  if(is.null(AllOutputs[[i]][[1]][[6]])){next}
+  avwavelengths2mg1[i] <- length(AllOutputs[[i]][[1]][[6]])
+}
+avwavelengths2mg2 <- c()
+for(i in 1:112){
+  if(is.null(AllOutputs[[i]][[3]][[6]])){next}
+  avwavelengths2mg2[i] <- length(AllOutputs[[i]][[3]][[6]])
+}
+avwavelengths0mg <- c(avwavelengths0mg1, avwavelengths0mg2)
+avwavelengths2mg <- c(avwavelengths2mg1, avwavelengths2mg2) 
+length_0mg <- max(avwavelengths0mg[!is.na(avwavelengths0mg)])
+length_2mg <- max(avwavelengths2mg[!is.na(avwavelengths2mg)])
+
+
+
+############################################################### 2mg: 
+pulse_2mg <- data.frame(1:(length_2mg))
+for(i in 1:112){
+  if(is.null(AllOutputs[[1]][[2]][[6]])){next}
+  dif1 <- length_2mg - length((AllOutputs[[i]][[1]][[6]]))
+  dif2 <- length_2mg - length((AllOutputs[[i]][[3]][[6]]))
+  pulse_2mg <- cbind(pulse_2mg, c(AllOutputs[[i]][[1]][[6]], rep(NA, dif1)))
+  pulse_2mg <- cbind(pulse_2mg, c(AllOutputs[[i]][[3]][[6]], rep(NA, dif2)))
+}
+colnames(pulse_2mg) <- c("index", 1:(ncol(pulse_2mg)-1))
+p <- pulse_2mg
+# remove empty columns:
+empty_columns <- c()
+for(i in 1:ncol(p)){
+  if(length(p[, i][!is.na(p[, i])]) < 1){
+    empty_columns[i] <- i
+  }
+}
+empty_columns <- empty_columns[!is.na(empty_columns)]
+p <- p[, -c(empty_columns)]
+# Find the first NA value of each wave in p:
+ao <- c()
+for(i in 2:ncol(p)){
+  nas <- which(is.na(p[, i]))
+  tmp <- which(nas > 200)  # Around the time of the systolic peak - no wave should be this short or this delayed in starting
+  ao[i] <- nas[tmp][1]
+}
+# On 2mg it is necessary to remove some of the outlier waves first...
+# find the outliers at the notch x-point i.e around 250
+outlier_waves <- which(  as.double(p[250, ]) > 0.5  )
+outlier_waves <- outlier_waves[-1]
+p <- p[, -c(outlier_waves)]
+# Plug into find_average
+avWave2mg <- find_average(p, ao)
+# adjustments are needed to the archetype wave tail:
+avWave2mg <- avWave2mg[-326]
+# set an ideal end_point
+#plot(avWave2mg[!is.na(avWave2mg)])
+#points(250, avWave2mg[119], col = "red")
+# find the point where the trajectory needs to change:
+start_tail <- 119+215
+end_tail <- 250+119
+x_diff <- end_tail - start_tail
+# need a sequence of descending y-values to join the start and end points
+new_tail <- seq(avWave2mg[start_tail], to = avWave2mg[119], length.out = x_diff)
+# redefine the tail using the above:
+avWave2mg[(start_tail+1):end_tail] <- new_tail
+# remove the bit after the tail:
+avWave2mg <- avWave2mg[-((251+119):length(avWave2mg))]
+# remove one last pesky point:
+avWave2mg <- avWave2mg[-(217+218)]
+# Plot
+average <- data.frame(1:length(avWave2mg))
+average <- cbind(average, avWave2mg)
+colnames(average)[1] <- "x"
+pulse_2mg_stacked <- gather(p, key = "time_series_ID", value = "values", -c("index"))
+ggplot(data = pulse_2mg_stacked, aes(index, values, col = time_series_ID), col = "black") + 
+  scale_color_manual(values = rep("black", ncol(pulse_2mg))) + 
+  geom_line(size = 1.5, alpha = ((1/ncol(pulse_2mg)*10)-(1/ncol(pulse_2mg)))) + 
+  theme(legend.position = "none") + xlim(75, 500) +
+  geom_line(data = average, aes(x, avWave2mg), size = 1.125, color = "red") + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+
+#################################################################### 
+
+
+
+
+
+############################################################### 0mg: 
+pulse_0mg <- data.frame(1:(length_0mg))
+for(i in 1:112){
+  if(is.null(AllOutputs[[1]][[2]][[6]])){next}
+  dif1 <- length_0mg - length((AllOutputs[[i]][[2]][[6]]))
+  dif2 <- length_0mg - length((AllOutputs[[i]][[4]][[6]]))
+  pulse_0mg <- cbind(pulse_0mg, c(AllOutputs[[i]][[2]][[6]], rep(NA, dif1)))
+  pulse_0mg <- cbind(pulse_0mg, c(AllOutputs[[i]][[4]][[6]], rep(NA, dif2)))
+}
+colnames(pulse_0mg) <- c("index", 1:(ncol(pulse_0mg)-1))
+p <- pulse_0mg
+# remove empty columns:
+empty_columns <- c()
+for(i in 1:ncol(p)){
+  if(length(p[, i][!is.na(p[, i])]) < 1){
+    empty_columns[i] <- i
+  }
+}
+empty_columns <- empty_columns[!is.na(empty_columns)]
+p <- p[, -c(empty_columns)]
+# Find the first NA value of each wave in p:
+ao <- c()
+for(i in 2:ncol(p)){
+  nas <- which(is.na(p[, i]))
+  tmp <- which(nas > 200)  # Around the time of the systolic peak - no wave should be this short or this delayed in starting
+  ao[i] <- nas[tmp][1]
+}
+# Plug into find_average
+avWave0mg <- find_average(p, ao)
+# Once again, adjustments are needed to the archetype wave tail:
+# set an ideal end_point
+#plot(avWave0mg[!is.na(avWave0mg)])
+#points(400, avWave0mg[[116]], col = "red")
+# find the point where the trajectory needs to change:
+start_tail <- 116 + 300
+end_tail <- 116 + 400
+x_diff <- end_tail - start_tail
+# need a sequence of descending y-values to join the start and end points
+new_tail <- seq(avWave0mg[start_tail], to = avWave0mg[116], length.out = x_diff)
+# redefine the tail using the above:
+avWave0mg[(start_tail+1):end_tail] <- new_tail
+# remove the bit after the tail:
+avWave0mg <- avWave0mg[-((401+116):length(avWave0mg))]
+# Plot
+average <- data.frame(1:length(avWave0mg))
+average <- cbind(average, avWave0mg)
+colnames(average)[1] <- "x"
+pulse_0mg_stacked <- gather(pulse_0mg, key = "time_series_ID", value = "values", -c("index"))
+ggplot(data = pulse_0mg_stacked, aes(index, values, col = time_series_ID), col = "black") + 
+  scale_color_manual(values = rep("black", ncol(pulse_0mg))) + 
+  geom_line(size = 1.5, alpha = ((1/ncol(pulse_0mg)*10)-(1/ncol(pulse_0mg)))) + 
+  theme(legend.position = "none") + xlim(75, 700) +
+  geom_line(data = average, aes(x, avWave0mg), size = 1.125, color = "red") + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#################################################################### 
+
+
+############################# Average of averaged waves superimposed: 
+
+# cleaning the tails:
+avWave0mg[500:700] <- NA
+avWave2mg[400:500] <- NA
+# Plot:
+plot(avWave0mg, t = "l", xlim = c(100, 650))
+lines(avWave2mg, col = "red")
+
+####################################################################
+
+
+#######################################################################################################################################
+
+
+
+
+
+
+
+
+######################################################### Dose level comparison: #######################################################
+
+# Note: each individual datapoint plotted is an average for both time series of one participant
+
+
+########################  Violin Plots of Morphological features:
+
+# Generate vectors for storing the mean value for each participant:
+zero.m <- list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)   
+two.m <- list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+
+for(j in 1:15){   # 15 is the number of morphological features extracted (in the dataframe)
+  for(i in 1:length(AllOutputs)){
+    if(is.null(AllOutputs[[i]])){next}
+    zeromg <- c(AllOutputs[[i]][[2]][[2]][[j]], AllOutputs[[i]][[4]][[2]][[j]])
+    twomg <- c(AllOutputs[[i]][[1]][[2]][[j]], AllOutputs[[i]][[3]][[2]][[j]])   
+    zero.m[[j]][i] <- mean(zeromg)                                                     # Can change this to other summary statistics e.g sd, median
+    two.m[[j]][i] <- mean(twomg)
+  }
+}
+
+df <- list()
+for(j in 1:15){
+  # Remove unfilled values:
+  zero.m[[j]][12] <- NA
+  # And 2mg:
+  two.m[[j]][12] <- NA
+  # Arrange data appropriately i.e stacked dataframe:
+  feat.0mg <- data.frame(zero.m[[j]])
+  feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+  colnames(feat.0mg) <- c("values", "dose")
+  feat.2mg <- data.frame(two.m[[j]])
+  feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+  colnames(feat.2mg) <- c("values", "dose")
+  # Combine
+  df[[j]] <- rbind(feat.0mg, feat.2mg)
+}
+
+# Violin plot with ggplot:
+a <- ggplot(data = df[[1]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("S height") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank())      
+b <- ggplot(data = df[[2]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("N height") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank())  
+c <- ggplot(data = df[[3]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("D height") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+d <- ggplot(data = df[[4]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Notch to Peak Ratio") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+e <- ggplot(data = df[[5]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Peak to Peak time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+f <- ggplot(data = df[[6]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Max Amplitude") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+g <- ggplot(data = df[[7]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Area Under Wave") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+h <- ggplot(data = df[[8]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Area Under Diastolic Section") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+i <- ggplot(data = df[[9]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Wave Length") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+j <- ggplot(data = df[[10]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Inflection Point Area ratio") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + ylim(-50, 50) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+k <- ggplot(data = df[[11]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Peak to Notch time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+l <- ggplot(data = df[[12]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Notch Time (ratio)") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+m <- ggplot(data = df[[13]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Augmentation Index (AI)") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+n <- ggplot(data = df[[14]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Alternative AI") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+o <- ggplot(data = df[[15]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Crest Time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+
+# Plot (adjust features included / ncol / nrow, as required):
+grid.arrange(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, ncol = 5, nrow = 3)
+
+#################################################################
+
+
+
+
+##############################  Violin Plots of Model Parameters:
+
+zero.m <- list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+two.m <-  list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+for(j in 5:16){                            # The column numbers of the 12 parameters in beat
+  for(i in 1:length(AllOutputs)){
+    if(is.null(AllOutputs[[i]])){next}
+    zeromg <- c(AllOutputs[[i]][[2]][[1]][[j]], AllOutputs[[i]][[4]][[1]][[j]])
+    twomg <- c(AllOutputs[[i]][[1]][[1]][[j]], AllOutputs[[i]][[3]][[1]][[j]])   
+    zero.m[[j]][i] <- mean(zeromg)
+    two.m[[j]][i] <- mean(twomg)
+  }
+}
+
+# Clean:
+zero.m <- zero.m[-c(1:4)]
+two.m <- two.m[-c(1:4)]
+# Combine:
+df <- list()
+for(j in 1:12){
+  # Remove unfilled values:
+  zero.m[[j]][12] <- NA
+  # And 2mg:
+  two.m[[j]][12] <- NA
+  # Arrange data appropriately i.e stacked dataframe:
+  feat.0mg <- data.frame(zero.m[[j]])
+  feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+  colnames(feat.0mg) <- c("values", "dose")
+  feat.2mg <- data.frame(two.m[[j]])
+  feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+  colnames(feat.2mg) <- c("values", "dose")
+  # Combine
+  df[[j]] <- rbind(feat.0mg, feat.2mg)
+}
+
+# Violin plots with ggplot:
+a <- ggplot(data = df[[1]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Baseline 1") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank())      
+b <- ggplot(data = df[[2]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Baseline 2") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank())  
+c <- ggplot(data = df[[3]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("S Time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+d <- ggplot(data = df[[4]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("S Amp") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+e <- ggplot(data = df[[5]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("S Width") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+f <- ggplot(data = df[[6]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("D Time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+g <- ggplot(data = df[[7]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("D Amp") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+h <- ggplot(data = df[[8]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("D Width") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+i <- ggplot(data = df[[9]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("N Time") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+j <- ggplot(data = df[[10]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("N Amp") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+k <- ggplot(data = df[[11]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("N Width") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+l <- ggplot(data = df[[12]], aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Config Rate") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+
+# Plot:
+grid.arrange(a, b, c, d, e, f, g, h, i, j, k, l, ncol = 4, nrow = 3)
+
+#################################################################
+
+
+
+
+
+########################  Alternative Morphological Feature Plots using time series:
+
+
+# In this case, each datapoint will correspond to one time series, meaning there are two datapoints for each dose level per participant
+
+zero.m1 <- list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+zero.m2 <- list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+two.m1 <-  list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+two.m2 <-  list(1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15, 1:15)
+for(j in 5:16){   
+  for(i in 1:length(AllOutputs)){
+    if(is.null(AllOutputs[[i]])){next}
+    zeromg1 <- AllOutputs[[i]][[2]][[1]][[j]]
+    zeromg2 <- AllOutputs[[i]][[4]][[1]][[j]]
+    twomg1 <- AllOutputs[[i]][[1]][[1]][[j]] 
+    twomg2 <- AllOutputs[[i]][[3]][[1]][[j]]
+    zero.m1[[j]][i] <- mean(zeromg1)
+    zero.m2[[j]][i] <- mean(zeromg2)
+    two.m1[[j]][i] <- mean(twomg1)
+    two.m2[[j]][i] <- mean(twomg2)
+  }
+  # Remove unfilled values:
+  zero.m1[[j]][12] <- NA
+  zero.m2[[j]][12] <- NA
+  two.m1[[j]][12] <- NA
+  two.m2[[j]][12] <- NA
+  # Condense lists down into 2:
+  zero.m[[j]] <- c(zero.m1[[j]], zero.m2[[j]]) 
+  two.m[[j]] <- c(two.m1[[j]], two.m2[[j]])
+}
+# Clean:
+zero.m <- zero.m[-c(1:4)]
+two.m <- two.m[-c(1:4)]
+# Combine:
+df <- list()
+for(j in 1:12){
+  # Arrange data appropriately i.e stacked dataframe:
+  feat.0mg <- data.frame(zero.m[[j]])
+  feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+  colnames(feat.0mg) <- c("values", "dose")
+  feat.2mg <- data.frame(two.m[[j]])
+  feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+  colnames(feat.2mg) <- c("values", "dose")
+  # Combine
+  df[[j]] <- rbind(feat.0mg, feat.2mg)
+}
+
+# From this point, you can repeat the same ggplot routine as for the averaged by participant code above, just make sure it looks like there are twice as many dots!
+
+#################################################################################### 
+
+
+####################################################### Violin plots for IBI / HR / SDNN:
+
+# Note: To generate IBI, HR and HRV values you need to run the time series through all participants, 
+#       up to but not including the model. I have pre-saved versions to load from below, based on the 
+#       initial subset analysed. 
+
+####################### IBI:
+
+# Load IBI values:
+load("~/Desktop/ibis_0mg1.RData")
+load("~/Desktop/ibis_0mg2.RData")
+load("~/Desktop/ibis_2mg1.RData")
+load("~/Desktop/ibis_2mg2.RData")
+# Turn ibi lists into a vector of all 0mg and all 2mg IBIs (ignore warnings):
+ibi0mg <- c()
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi0mg <- c(ibi0mg, mean(ibis_0mg1[[i]]))
+}
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi0mg <- c(ibi0mg, mean(ibis_0mg2[[i]]))
+}
+ibi2mg <- c()
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi2mg <- c(ibi2mg, mean(ibis_2mg1[[i]]))
+}
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi2mg <- c(ibi2mg, mean(ibis_2mg2[[i]]))
+}
+# Remove NAs
+ibi0mg <- ibi0mg[!is.na(ibi0mg)]
+ibi2mg <- ibi2mg[!is.na(ibi2mg)]
+# Arrange data appropriately i.e stacked dataframe:
+feat.0mg <- data.frame(ibi0mg)
+feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+colnames(feat.0mg) <- c("values", "dose")
+feat.2mg <- data.frame(ibi2mg)
+feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+colnames(feat.2mg) <- c("values", "dose")
+# Combine
+df_ibi <- rbind(feat.0mg, feat.2mg)
+# Plot violins:
+IBI <- ggplot(data = df_ibi, aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("ibi - mean value per time series") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+
+###########################
+
+
+####################### HR:
+
+# Plot as Heart Rate:
+ibi0mg <- ibi0mg/40 # correct for sample rate
+HR0mg <- 60/ibi0mg  # HR from IBI [bpm] = 60/IBI
+ibi2mg <- ibi2mg/40
+HR2mg <- 60/ibi2mg
+# Arrange data appropriately i.e stacked dataframe:
+feat.0mg <- data.frame(HR0mg)
+feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+colnames(feat.0mg) <- c("values", "dose")
+feat.2mg <- data.frame(HR2mg)
+feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+colnames(feat.2mg) <- c("values", "dose")
+# Combine
+df_hr <- rbind(feat.0mg, feat.2mg)
+HR <- ggplot(data = df_hr, aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("Mean Heart Rate (IBI derived)") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+
+###########################
+
+##################### SDNN:
+
+ibi0mg <- c()
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi0mg <- c(ibi0mg, sd(ibis_0mg1[[i]]))
+}
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi0mg <- c(ibi0mg, sd(ibis_0mg2[[i]]))
+}
+ibi2mg <- c()
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi2mg <- c(ibi2mg, sd(ibis_2mg1[[i]]))
+}
+for(i in 1:112){
+  if(is.null(i)){next}
+  ibi2mg <- c(ibi2mg, sd(ibis_2mg2[[i]]))
+}
+# Remove NAs
+ibi0mg <- ibi0mg[!is.na(ibi0mg)]
+ibi2mg <- ibi2mg[!is.na(ibi2mg)]
+# Arrange data appropriately i.e stacked dataframe:
+feat.0mg <- data.frame(ibi0mg)
+feat.0mg <- cbind(feat.0mg, rep("0mg", nrow(feat.0mg)))
+colnames(feat.0mg) <- c("values", "dose")
+feat.2mg <- data.frame(ibi2mg)
+feat.2mg <- cbind(feat.2mg, rep("2mg", nrow(feat.2mg)))
+colnames(feat.2mg) <- c("values", "dose")
+# Combine
+df_sdnn <- rbind(feat.0mg, feat.2mg)
+# Plot violins:
+SDNN <- ggplot(data = df_sdnn, aes(x = dose, y = values, fill = dose)) + geom_violin() + ggtitle("SDNN - mean value per time series") + scale_fill_manual(values = c("#00c3c5", "#ff6b69")) + theme(legend.position = "none") + geom_jitter(shape=16, position=position_jitter(0.1)) + theme(axis.title.x=element_blank(), axis.title.y = element_blank()) 
+
+###########################
+
+#########################################################################################
+
+##########################################################################################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+############################################## ROC curves: ####################################################
+
+################################## ROC of morphology + HR + SDNN:
+
+# Note: We are focusing here on the 4 best morphological features + HR + SDNN 
+# Note: To run this section you will need the same dataframe of features generated for the morphology violin plots: 'df', 
+# plus dataframes generated from HR + SDNN
+
+evaluate.classification <- function(pred, truth, model = NULL, order = c("2mg", "0mg")) {
+  require(ROCR)
+  roc.pred <- prediction(pred,truth, label.ordering = order)
+  auc <- unlist(attr(performance(roc.pred,"auc"), 'y.values'))
+  mcc <- sapply(attr(performance(roc.pred, 'phi'),'y.values'), max, na.rm=T)
+  roc.perf <- performance(roc.pred,"tpr","fpr")
+  return(list(auc=auc, mcc=mcc, roc=roc.perf))
+}
+# df above gives all morphological metrics, e.g df[[2]] = stacked dataframe for notch height
+df <- df[-14]  # remove alternative AI
+# metrics <- c(df[[1]], df[[2]], df[[3]], df[[4]], df[[5]], df[[6]])
+metric_names = c("Wave length", "N Amplitude", "Heart Rate", "D Amplitude", "Area under wave", "SDNN")
+# Ordering so that they are ranked by performance... 
+df_final <- list(df[[9]], df[[2]], df_hr, df[[3]], df[[7]], df_sdnn)
+
+# Setting up the plot:
+bg.col=grey(0.8)      
+plot(x=c(0,1),y=c(0,1),type='n',xaxs='i',yaxs='i',
+     xlab="False Positive Rate",ylab="True Positive Rate", cex.lab=2,cex.axis=1)
+grid.position <- seq(0.1, 0.9, 0.1)
+segments(x0=grid.position,y0=0,x1=grid.position,y1=1,lty=2,col=bg.col)
+segments(x0=0,y0=grid.position,x1=1,y1=grid.position,lty=2,col=bg.col)
+require(RColorBrewer)
+# my.col =  brewer.pal(6,'Accent')
+my.col = c("#ff1100", "#cf0e00", "#ab0c00", "#8c0a00", "#6e0800", "#4f0600") 
+lines = seq(-13,(-20-3*length(metrics)+3*1),by=-2)
+abline(a=0,b=1,lty=1,col=bg.col)
+
+# Plot a line for each metric:   
+for(i in 1:6){      
+  m <- df_final[[i]]
+  if(i == 1 | i == 2 | i == 4 | i == 5){
+    m <- m[-c(which(is.na(m$values))), ]        # skip this line for HR, SDNN
+  } 
+  if(i == 3){
+    perf <- evaluate.classification(pred = m$values, truth = m$dose, order = c("0mg", "2mg"))
+  }else{
+    perf <- evaluate.classification(pred = m$values, truth = m$dose)
+  }
+  plot(perf$roc,avg="vertical",spread.estimate="stderror",xaxs='i',yaxs='i',    
+       xlab="False Positive Rate",ylab="True Positive Rate",col=my.col[i],add=T, lwd=1.1)
+  mtext(paste('AUC =',format(mean(perf$auc), digits=3),'  Metric: ',metric_names[i],'   '),
+        side=3, adj=1, line=lines[i], cex=1, col=my.col[i])
+}
+
+#################################################################
+
+
+
+######################################## ROC for model2 features: 
+
+# Note: df needs to be defined as per violin plots above before running this section
+
+metrics <- c(df[[1]], df[[2]], df[[3]], df[[4]], df[[5]], df[[6]], df[[7]], df[[8]], df[[9]], df[[10]], df[[11]], df[[12]])
+metric_names = c("Baseline1", "Baseline2", "S Time", "S Amp", "S Width", "D Time", "D Amp", "D Width", "N Time", "N Amp", "N Width", "Config Rate")
+
+df_final <- list(df[[12]], df[[5]], df[[11]], df[[1]], df[[8]], df[[9]])
+metric_names = metric_names[c(12, 5, 11, 1, 8, 9)]
+metric_names <- c("Decay Rate", "S Width", "R1 Width", "1st Baseline", "R2 Width", "R1 Time")
+
+# If adding wave length for comparison:
+df_final <- list(df_final[[1]], df_final[[2]], df_final[[3]], df_final[[4]], df_final[[5]], df_final[[6]], df1[[9]])
+metric_names <- c(metric_names, "wave length")
+
+# Setting up the plot:
+bg.col=grey(0.8)      
+plot(x=c(0,1),y=c(0,1),type='n',xaxs='i',yaxs='i',
+     xlab="False Positive Rate",ylab="True Positive Rate", cex.lab=2,cex.axis=1)
+grid.position <- seq(0.1, 0.9, 0.1)
+segments(x0=grid.position,y0=0,x1=grid.position,y1=1,lty=2,col=bg.col)
+segments(x0=0,y0=grid.position,x1=1,y1=grid.position,lty=2,col=bg.col)
+require(RColorBrewer)
+#my.col =  brewer.pal(length(metrics),'Blues')
+#my.col = c(my.col, "#03dffc", "#0307fc", "#d703fc", "#fc0303")
+my.col = c("#ff1100", "#cf0e00", "#ab0c00", "#8c0a00", "#6e0800", "#4f0600", "#3C33FF") 
+lines = seq(-13,(-20-3*length(metrics)+3*1),by=-2)
+abline(a=0,b=1,lty=1,col=bg.col)
+
+# Plot a line for each metric:
+for(i in 1:6){
+  m <- df_final[[i]]
+  m <- m[-c(which(is.na(m$values))), ]
+  if(i == 5 | i == 2){
+    perf <- evaluate.classification(pred = m$values, truth = m$dose, order = c("0mg", "2mg"))
+  }else{
+    perf <- evaluate.classification(pred = m$values, truth = m$dose)
+  }
+  plot(perf$roc,avg="vertical",spread.estimate="stderror",xaxs='i',yaxs='i',    
+       xlab="False Positive Rate",ylab="True Positive Rate",col=my.col[i],add=T, lwd=1.1)
+  mtext(paste('AUC =',format(mean(perf$auc), digits=3),'  Metric: ',metric_names[i],'   '),
+        side=3, adj=1, line=lines[i], cex=1, col=my.col[i])
+}
+
+#################################################################
+
+
+####################################################################################################################################
