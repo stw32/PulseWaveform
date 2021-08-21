@@ -1,10 +1,6 @@
 # PulseWaveform
 An automated pipeline for the extraction of PPG waveform features, including the Hybrid Excess and Decay (HED) model for extraction of component wave features.
 
----
-title: "ReadMe"
-output: md_document
----
 
 ```{r setup, include=FALSE}
 ```
