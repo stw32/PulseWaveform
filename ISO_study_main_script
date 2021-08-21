@@ -1,4 +1,4 @@
-# ISO Study Analysis Script:
+# ISO Study Main Script:
 
 setwd("Desktop/Scripts")
 
