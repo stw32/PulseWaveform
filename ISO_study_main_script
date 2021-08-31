@@ -65,7 +65,7 @@ for(run in c(1:length(Participants))){
       
       temp <- FindUndetrendingParams(direc = direc[1], gs = model2.GetSegment, oa = OffsetAdjust,            # ISO specific pre-processing (see readme)
                                      fa = FactorAdjust, u = UnDetrend, factorCutoff = 0, sr = samplingRate, 
-                                     pairs = pairs, pk_thrshd = pk_thrshd, plot = T)
+                                     pairs = pairs, pk_thrshd = pk_thrshd, plot = F)
       factor_value <- temp[1]
       offset_value <- temp[2]
       
@@ -348,10 +348,13 @@ for(run in c(1:length(Participants))){
           }
           
       
-          if(ps == 1){                                                                                       # All measures from time series 1-4 are outputted in turn for each participant
+           if(ps == 1){                                                                                       # All measures from time series 1-4 are outputted in turn for each participant
             if(pr == 1){otpt <- 1}else{otpt <- 2}
           }else{
             if(pr == 1){otpt <- 3}else{otpt <- 4}
+          }
+          if(run_hed == FALSE){
+            fit_check <- list(c(1:100), c(1:100), c(1:100))
           }
           temp <- ArrangeOutputs(beat_final, beat_orig, features, pulse, fit_check, ps, pr)
           Outputs[[otpt]] <- list(temp[[1]], temp[[2]], temp[[3]], osnd_fits, osnd_all, avWave, osnd, pulse, polyWave)
