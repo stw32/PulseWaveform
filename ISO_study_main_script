@@ -1,65 +1,90 @@
-# ISO Study Main Script:
+#### ISO study main script: ####
 
-setwd("Desktop/Scripts")
+# This script contains the main PPG processing pipeline and the HED model.
+# The HED model is nested within this script. Running it is optional, it can be bypassed if only traditional morphological features are desired. 
+# This script is also tailored to the ISO dataset - as such, the data is assumed to consist of a number of participants, each with two isoprenaline and two placebo (saline) time series.
+# This script is also wrapped within the tryCatch function - to prevent errors in individual time series from interupting the running of the entire dataset. 
+
+# Prelims:
+  # Download and save scripts from the PulseWaveform repository to a single folder
+  # Set working directory to that folder
+  # Ensure the below packages (tidyverse etc) are installed 
+  # Set starting parameters (samplingRate etc) as required
+
+setwd("Desktop/Scripts")    
 
 library(tidyverse)                                 
 library(splines2)
 library(pracma)
 library(SplinesUtils) 
+library(spectral)
+library(DescTools)
 library(zoo)
 
 source("~/Desktop/Scripts/PPG_funcs.R")
 source("~/Desktop/Scripts/iso_funcs.R")
 
-dir <- "~/Desktop/Khalsa_Fletcher_collaboration copy/Physio Dial/ISO_3.0/Iso_3_PhysioData/"
-run_order <- read.csv("~/Desktop/PulseAnalysis/ISO_3_run_dose_order.txt", sep = "")
+dir <- "~/Desktop/Khalsa_Fletcher_collaboration copy/Physio Dial/ISO_3.0/Iso_3_PhysioData/"         # Directory to the ISO dataset (replace as required)
+run_order <- read.csv("~/Desktop/PulseAnalysis/ISO_3_run_dose_order.txt", sep = "")                 # Directory to document for decoding dose orders
 Participants <- GetParticipants(dir)
 
-samplingRate <- 40
-beats_in.m <- 10
-batch_number <- 10
-all_beats <- TRUE
-subset <- TRUE
-pk_thrshd <- 300
 
-errors <- list()
-AllOutputs<- list()
-rejected_waves_list1 <- list()
-rejected_waves_list3 <- list()
-waves_carried_forward1 <- list()
-waves_carried_forward3 <- list()
+samplingRate <- 40                  # Sampling Rate
+beats_in.m <- 10                    # Number of beats in a batch, over which the width, reflectance timing, and decay rate parameters will be fixed (set to 1 to model each waveform independantly (with all 12 parameters free))
+all_beats <- TRUE                   # Setting to true ensures all available beats in a given time series are modeled
+batch_number <- 10                  # If all beats = false, determines the number of batches of waves to process
+subset <- TRUE                      # Subsets Iso 3 time series using IBI intervals (see supplementary material)
+pk_thrshd <- 300                    # Objective threshold for initial identification of peaks in the 1st derivative (likely to require changing with different data sources - see line 96)
+run_hed <- TRUE                     # Run the HED Model (set to false if only traditional morphological features are desired) 
+plot_aligned_waves <- TRUE          # Visualise entire waveform sample (including average) for overview of waveform morphology / variability
+plot_osnd <- TRUE                   # Visualise OSND points of all waveforms in relation to the average wave of the sample
 
-for(run in 1:length(Participants)){  
+errors <- list()                    # For storing any time series that breaks the pipeline / model
+AllOutputs <- list()                # For storing morphological and HED model outputs
+rejected_waves_list1 <- list()      # For storing rejected waves (iso)
+rejected_waves_list3 <- list()      # For storing rejected waves (saline)
+waves_carried_forward1 <- list()    # For storing number of waves in a time series post cleaning +/- subsetting (iso)
+waves_carried_forward3 <- list()    # For storing number of waves in a time series post cleaning +/- subsetting (saline)
+ibis_0mg1 <- list()                 # For storing IBI values
+ibis_0mg2 <- list()                 #     "         "
+ibis_2mg1 <- list()                 #     "         "
+ibis_2mg2 <- list()                 #     "         "
+
+
+
+
+for(run in c(1:length(participants))){  
   
   errors[[run]] <- tryCatch(
     
     expr = {
       
-      direc <- GetDirec(run, Participants, dir)
-      pairs <- GetPairs(direc = direc[1], run_order, participant_number = run, subjectID = direc[2])
+      direc <- GetDirec(run, Participants, dir)                                                              # Find the directory for an individual participant
+      pairs <- GetPairs(direc = direc[1], run_order, participant_number = run, subjectID = direc[2])         # Identify the four time series (two saline, two isoprenaline) for a given participant
       
-      temp <- FindUndetrendingParams(direc = direc[1], gs = model2.GetSegment, oa = OffsetAdjust, fa = FactorAdjust, u = UnDetrend, factorCutoff = 0, sr = samplingRate, pairs = pairs, pk_thrshd = pk_thrshd, plot = F)
+      
+      temp <- FindUndetrendingParams(direc = direc[1], gs = model2.GetSegment, oa = OffsetAdjust,            # ISO specific pre-processing (see readme)
+                                     fa = FactorAdjust, u = UnDetrend, factorCutoff = 0, sr = samplingRate, 
+                                     pairs = pairs, pk_thrshd = pk_thrshd, plot = T)
       factor_value <- temp[1]
       offset_value <- temp[2]
       
-      Outputs <- list()
-      for(ps in 1:2){
+      Outputs <- list()                                                                                      # For storing individual time series outputs
+      for(ps in 1:2){                                                                                        # The four time series are arranged in two pairs, which are run through sequentially
         
         if(ps == 1){pair <- pairs[[1]]}else{pair <- pairs[[2]]}
         
-        for(pr in 1:2){
+        for(pr in 1:2){                                                                                      # Each pair contains one isoprenaline time series (pr = 1), and one placebo (saline) time series (pr = 2), which are run through in order. 
           beats_in <- beats_in.m   
           new_direc <- paste(direc[1], "/", pair[pr], sep = "")
           
-          # If on the 2nd (i.e placebo) run, pass boundaries in to subsetting:
-          if(pr == 2){subset <- "rep"}
+          if(pr == 2){subset <- "rep"}                                                                       # If on the 2nd (i.e placebo) run of a pair, subsetting boundaries from the preceding isoprenline time series are passed in.
           if(pr == 1){
             subset <- TRUE
             boundaries = NULL
           }
           
-          # Load time series:
-          ppg <- read.csv(new_direc, sep = "")   
+          ppg <- read.csv(new_direc, sep = "")                                                               # Load individual time series 
           ppg <- data.frame(
             time = (0:(nrow(ppg)-1)) / samplingRate,
             ppg = ppg[,1]
@@ -68,20 +93,15 @@ for(run in 1:length(Participants)){
           names(ppg)[2] <- "Detrended"
           
           
-          # Define beat:  
-          n <- dim(ppg)[1]
-          vpg <- ppg[2:n,2] - ppg[1:(n-1),2]
+          n <- dim(ppg)[1]                                                                                   # Identify peaks in 1st derivative (if pk_thrshd needs adjusting, plot vpg and determine a
+          vpg <- ppg[2:n,2] - ppg[1:(n-1),2]                                                                 # y-axis value above which all inflection points should be peaks, then set pk_thrshd to this value)
           beat <- data.frame(ppg[which(vpg[1:(n-1)] < pk_thrshd & vpg[2:n] >= pk_thrshd),1])  
           rm(vpg)
           
-          # Apply factor and offset:
-          ppg[,2] = UnDetrend(ppg,factor=factor_value,offset=offset_value)  
+          ppg[,2] = UnDetrend(ppg,factor=factor_value,offset=offset_value)                                   # Apply factor and offset (preprocessing parameters) (Visualise pre-processed time series with plot(ppg[,1],ppg[,2],t='l') if desired)
           
-          # Check time series:
-          # plot(ppg[,1],ppg[,2],t='l')
-          
-          # Run main script, find peaks using find_w, generate segments from O values, correct baseline:
-          undetrended <- ppg[, 2]
+
+          undetrended <- ppg[, 2]                                                                            # Run main pipeline
           sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")
           deriv1 <- sfunction(seq(1, length(undetrended)), deriv = 1)
           spline1 <-  sfunction(seq(1, length(undetrended)), deriv = 0)
@@ -89,18 +109,20 @@ for(run in 1:length(Participants)){
           deriv1Poly <- CubicInterpSplineAsPiecePoly(1:length(undetrended), deriv1, "natural") 
           inflexX <- solve(splinePoly, b = 0, deriv = 1)
           inflexY <- predict(splinePoly, inflexX)
-          w <- find_w(d1p = deriv1Poly, deriv1 = deriv1, sp = splinePoly, sr = samplingRate)
-          uv <- find_u_v(wx = w$wX, wy = w$wY, d1 = deriv1, d1p = deriv1Poly, spline = splinePoly, plot=F)
-          tmp <- find_o(wx = w$wX, inx = inflexX, iny = inflexY, d1p = deriv1Poly, sp = splinePoly)  
+          w <- find_w(d1p = deriv1Poly, deriv1 = deriv1, sp = splinePoly, sr = samplingRate)                 # Find peaks using custom peak detection algorithm
+          uv <- find_u_v(wx = w$wX, wy = w$wY, d1 = deriv1, d1p = deriv1Poly, 
+                         spline = splinePoly, sr = samplingRate, plot=F)
+          tmp <- find_o(wx = w$wX, inx = inflexX, iny = inflexY, d1p = deriv1Poly, sp = splinePoly)          # Identify O points (see main text)
           inflexX <- tmp[[1]]
           inflexY <- tmp[[2]]
-          o_orig <- tmp[[3]]  
+          o_orig <- tmp[[3]]     
           tmp <- preclean_wuv(w=w, uv=uv, o=o_orig, samp = samplingRate, sp = spline1, q = F)   
           w <- tmp[[1]]
           uv <- tmp[[2]]
           o <- tmp[[3]]
           rm(tmp)
-          baseCor <- baseline(inx = inflexX, iny = inflexY, o = o_orig, dat = undetrended, sp = splinePoly, plot=F)
+          baseCor <- baseline(inx = inflexX, iny = inflexY, o = o_orig,                                      # Correct baseline
+                              dat = undetrended, sp = splinePoly, plot=F)
           sfunctionBC <- splinefun(1:length(baseCor), baseCor, method = "natural")
           deriv1BC <- sfunctionBC(seq(1, length(baseCor)), deriv = 1)
           spline1BC <- sfunctionBC(seq(1, length(baseCor)), deriv = 0)
@@ -110,39 +132,67 @@ for(run in 1:length(Participants)){
           uv$uY <- predict(splinePolyBC, uv$uX)
           uv$vY <- predict(splinePolyBC, uv$vX)
           wuv <- cbind(w, uv)
-          tmp <- clean_wuv(wuv = wuv, sp = splinePolyBC, inx = inflexX, o = o, samp = samplingRate, bc = baseCor, q = F)   
+          tmp <- clean_wuv(wuv = wuv, sp = splinePolyBC, inx = inflexX, o = o, 
+                           samp = samplingRate, bc = baseCor, q = F)   
           wuv <- tmp[[1]]
           ibi <- tmp[[2]]
           oDiff <- tmp[[3]]
           rm(tmp, w, uv)
           waveLen <- round(median(oDiff)+15) 
           ppg[, 2] <- baseCor
-          tmp <- sep_beats(odiff = oDiff, bc = baseCor, samp = samplingRate, wuv = wuv, wvlen = waveLen, ibi=ibi, o=o_orig, inx = inflexX, scale = T, q = F, subset, boundaries) 
+          tmp <- sep_beats(odiff = oDiff, bc = baseCor, samp = samplingRate, wuv = wuv, wvlen = waveLen,     # Generate individual beat segments +/- subsetting
+                           ibi=ibi, o=o_orig, inx = inflexX, scale = T, q = F, subset, boundaries)           # Subsetting constraints (ppg_funcs -> sep_beats) were manually changed in some instances to ensure proper subsetting
           pulse <- tmp[[2]]
           avWave <- tmp[[1]]
           wuv <- tmp[[3]]
           rejects <- tmp[[4]]
-          if(subset == T){boundaries <- tmp[[5]]}
-          rm(tmp)
+          if(subset == T){
+            boundaries <- tmp[[5]]
+            ibi <- tmp[[6]]                                                                                  # Visualise baseline corrected time series with plot(ppg$`time (s)`[1:7500], ppg$Detrended[1:7500], type = "l"), 
+            }                                                                                                # then points(ppg[inflexX[o], 1], rep(0, length(inflexX[o]))), if desired
+          rm(tmp)                                                                                            
           
-          # Check time series:
-          # plot(ppg$`time (s)`[1:7500], ppg$Detrended[1:7500], type = "l")
-          # points(ppg[inflexX[o], 1], rep(0, length(inflexX[o])))
           
-          # Save rejected beats and waves carried forward:
-          if(pr == 1){
+        
+          if(plot_aligned_waves == TRUE){                                                                    # Plot aligned waves and average wave
+            pulse_stacked <- gather(pulse, key = "wave_ID", value = "values", -c("x"))
+            average <- data.frame(seq((-141/(samplingRate*10)), 
+                                      ((waveLen*15 -9)-142)/(samplingRate*10), by = 1/(samplingRate*10)))  
+            average <- cbind(average, avWave)
+            colnames(average)[1] <- "x"
+            ggplot(data = pulse_stacked, aes(x, values, col = wave_ID), col = "black") +
+              scale_color_manual(values = rep("black", ncol(pulse))) +  
+              geom_line(size = 1.5, alpha = ((1/length(wuv$wX)*10)-(1/length(wuv$wX)))) + 
+              geom_line(data = average, aes(x, avWave), size = 1.125, color = "red") +                       # y axis boundaries (ylim) will vary based on source data    
+              theme(legend.position = "none") + labs( y= "PPG Output", x = "Time (Seconds)") + 
+              xlim(-0.1, 0.75) +                                                                             # + xlim(c(pulse$x[max(which(is.na(avWave)))], pulse$x[length(avWave)])) + ylim(range(avWave[!is.na(avWave)]*1.5)) 
+              theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                    panel.background = element_blank(), axis.line = element_line(colour = "black"), 
+                    axis.title = element_blank(), 
+                    axis.text = element_text(size = 24)) + ylim(-0.6, 1.6)
+          }
+          
+          
+          if(pr == 1){                                                                                       # Save rejected beats, waves carried forward (after cleaning/subsetting), and IBI values
             if(ps == 1){
               rejected_waves_list1[[run]] <- rejects
               waves_carried_forward1[run] <- boundaries[2]
+              ibis_2mg1[[run]] <- ibi
             }else{
               rejected_waves_list3[[run]] <- rejects
               waves_carried_forward3[run] <- boundaries[2]
+              ibis_2mg2[[run]] <- ibi
+            }
+          }else{
+            if(ps==1){
+              ibis_0mg1[[run]] <- ibi
+            }else{
+              ibis_0mg2[[run]] <- ibi
             }
           }
-         
           
-          # Create beat dataframe and add output columns: 
-          beat <-  ppg[round(inflexX[wuv$o2]), 1]   
+          
+          beat <-  ppg[round(inflexX[wuv$o2]), 1]                                                            # Preliminary step for running the HED model (creating dataframe for model parameter outputs)
           nBeats <- length(beat)    
           beat <- data.frame(
             beat = beat,
@@ -154,20 +204,22 @@ for(run in 1:length(Participants)){
             remainder <- nrow(beat) - (batch_number*beats_in)
           }
           
-          # Add output columns to ppg:
-          ppg$Baseline = 1:nrow(ppg) * 0
-          ppg$Excess   = 1:nrow(ppg) * 0
+  
+          ppg$Baseline = 1:nrow(ppg) * 0                                                                     # Add output columns to ppg
+          ppg$Excess   = 1:nrow(ppg) * 0 
           ppg$Residue  = 1:nrow(ppg) * 0
           
-          # Fill beat and ppg with parameters derived from the excess:
-          temp <- FindStartParams(batch_number, beats_in, beat, ppg, gs = model2.GetSegment, e = model2.Excess, sep = model2.SubtractExcessPeak, o_points = inflexX[o_orig], wuv = wuv, inflexX = inflexX, all_beats)
+          temp <- FindStartParams(batch_number, beats_in, beat, ppg, gs = model2.GetSegment,                 # Fill beat and ppg with starting parameters, estimated from the excess
+                                  e = model2.Excess, sep = model2.SubtractExcessPeak, 
+                                  o_points = inflexX[o_orig], wuv = wuv, inflexX = inflexX, all_beats)
           beat <- temp[[1]]
           ppg <- temp[[2]]
           rm(temp)
           
-          # Make and run simplex for each batch:
-          beat_orig <- beat
+          beat_orig <- beat   
           fit_check <- list()
+          
+          if(run_hed == TRUE){                                                                               # Run the HED Model (number of waves to be modelled is specified above by all_beats / batch_number) 
           for(k in 1:(batch_number+1)){         
             
             if(all_beats == TRUE){
@@ -194,37 +246,53 @@ for(run in 1:length(Participants)){
             beat_end <- beat[, 4]
             beat_vector <- list(beats_in, beat_start, beat_end)
             
-            # Refine parameters:
-            for(i in 1:4){
+            for(i in 1:4){                                                                                   # Refine parameters using downhill simplex method (Nelder and Mead, 1965) for four runs
               if(i == 1){new_beat <- beat}
-              within_params <- FindWithinParams(beats_in, ppg, beat = new_beat, gs = model2.GetSegment, fp = model2.FixParams3, ms = simplex.MakeSimplex3, m2 = model2.ChiSq3, beat_vector = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
-              across_params <- simplex.MakeSimplex2(data=ppg, param = par, f = model2.ChiSq3, inScale = 0.1, beat_vector = beat_vector, beat = new_beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
+              within_params <- FindWithinParams(beats_in, ppg, beat = new_beat, gs = model2.GetSegment, 
+                                                fp = model2.FixParams3, ms = simplex.MakeSimplex3, 
+                                                m2 = model2.ChiSq3, beat_vector = beat_vector, 
+                                                renal_param = renal_param, dias_param = dias_param, 
+                                                sys_time = sys_time, w = w)
+              across_params <- simplex.MakeSimplex2(data=ppg, param = par, f = model2.ChiSq3, 
+                                                    inScale = 0.1, beat_vector = beat_vector, 
+                                                    beat = new_beat, renal_param = renal_param, 
+                                                    dias_param = dias_param, sys_time = sys_time, w = w)
               mat <- make_matrix(across_params, within_params)
-              sim <- simplex.Run2(data = ppg, simplexParam = mat, f = model2.ChiSq3, optional=NULL, beat_vector = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w, run = c("run", i))
+              sim <- simplex.Run2(data = ppg, simplexParam = mat, f = model2.ChiSq3, optional=NULL, 
+                                  beat_vector = beat_vector, renal_param = renal_param, 
+                                  dias_param = dias_param, sys_time = sys_time, w = w, run = c("run", i))
               output <- extractOutput(beats_in, sim)
-              fixed <- FixOutput(beats_in, beat = new_beat, ppg, gs = model2.GetSegment, fp = model2.FixParams3, across = output[[1]], within = output[[2]], sys_time = sys_time)
+              fixed <- FixOutput(beats_in, beat = new_beat, ppg, gs = model2.GetSegment, 
+                                 fp = model2.FixParams3, across = output[[1]], within = output[[2]], 
+                                 sys_time = sys_time)
               new_beat <- UpdateBeat(beats_in, beat, fixed)
               new_beat <- FixBaseline(new_beat, f = model2.ChiSq4, renal_param, dias_param, sys_time, w)
             }
             
-            # Assess fit:
-            fit_check[[k]] <- model2.ChiSq4(data = ppg, params = NULL, beats = beat_vector, beat = new_beat, a = sim[1, ], plot = FALSE, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w) 
+      
+            fit_check[[k]] <- model2.ChiSq4(data = ppg, params = NULL, beats = beat_vector,                  # Assess goodness of fit (ChiSq, Max error, NRMSE, and aNRMSE)
+                                            beat = new_beat, a = sim[1, ], plot = FALSE, 
+                                            renal_param = renal_param, dias_param = dias_param, 
+                                            sys_time = sys_time, w = w) 
             
-            # Finalise:
-            beat2 <- new_beat       
+            beat2 <- new_beat                                                                                # Finalise model outputs for a given batch
             colnames(beat2) <- colnames(beat)
             beat2 <- beat2[, -c(1:4)]
             
-            # Plot
-            #PlotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2)
+  
+            PlotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2)                     # Plots modelled waves (including component waves) with basic R plot function
             
-            # Add to overall beat:
-            if(k == 1){beat_final <- beat2}else{beat_final <- rbind(beat_final, beat2)}
+            # GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2,                 # Plots modelled waves in GGplot form (see main text figures) 
+            # run, pr, p = FALSE)
+              
+            if(k == 1){beat_final <- beat2}else{beat_final <- rbind(beat_final, beat2)}                      # Add model outputs from batch to dataframe containing all model outputs
             
           }
+          }
+    
           
-          # Complete main script to find OSND and morphological features:
-          polyWave <- list()
+        
+          polyWave <- list()                                                                                 # Complete main pipeline to find fiducial points (OSND)
           for(i in 2:ncol(pulse)){
             polyWave[[i-1]] <-CubicInterpSplineAsPiecePoly(pulse$x, pulse[, i], "natural")
           }
@@ -232,48 +300,54 @@ for(run in 1:length(Participants)){
           dPeak <- tmp[1]
           xShift <- tmp[2]
           rm(tmp)
-          osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate)
+          osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate, plot = F)
           if(dPeak == 5*samplingRate){
             dPeak <- osnd$x[4]*1.2 
           }
           if((osnd$x[4]-osnd$x[3]) < 1.5 & (osnd$x[4]-osnd$x[3]) > 0){
             dPeak <- dPeak*0.95
-            osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate)
+            osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate, plot = FALSE)
           }
-          scale <- 1   # Set to 1 if scaling
+          scale <- 1                                                                                         # Set to 1 if scaling (ideally this should be optional at the beginning, note other functions where scaling is optional would need to be incorporated)
           osnd_all <- list()
-          for(i in 2:ncol(pulse)){  #ncol(pulse)
+          for(i in 2:ncol(pulse)){ 
             wavi <- pulse[, i][!is.na(pulse[, i])]
             if(scale == 1){
-              xShift2 <- (which(abs(wavi - 0.5) == min(abs(wavi - 0.5))))  # the new 0.5 
+              xShift2 <- (which(abs(wavi - 0.5) == min(abs(wavi - 0.5))))   
             }else{
               xShift2 <- which.min(abs(wavi))
             }
             diff <- xShift - xShift2
             dpa <- dPeak - diff
-            osnd_all[[i-1]] <- osnd_of_average(aw = wavi, dp = dpa, diff = diff, sr = samplingRate, plot = F) 
+            osnd_all[[i-1]] <- osnd_of_average(aw = wavi, dp = dpa, diff = diff, 
+                                               sr = samplingRate, plot = F) 
           }
-          # Can plot all OSND values against the average to see if there are any obvious anomalies:
-          plot(avWave[!is.na(avWave)], type = "l")
-          for(i in 1:length(osnd_all)){
-            points(osnd_all[[i]][4, 1], osnd_all[[i]][4, 2], col = "blue")
-            points(osnd_all[[i]][3, 1], osnd_all[[i]][3, 2], col = "red")
-            points(osnd_all[[i]][2, 1], osnd_all[[i]][2, 2])
-            points(osnd_all[[i]][1, 1], osnd_all[[i]][1, 2])
+          
+          
+          if(plot_osnd == TRUE){                                                                             # Plot all OSND values against the average
+            plot(avWave[!is.na(avWave)], type = "l") + for(i in 1:length(osnd_all)){
+              points(osnd_all[[i]][4, 1], osnd_all[[i]][4, 2], col = "blue")
+              points(osnd_all[[i]][3, 1], osnd_all[[i]][3, 2], col = "red")
+              points(osnd_all[[i]][2, 1], osnd_all[[i]][2, 2])
+              points(osnd_all[[i]][1, 1], osnd_all[[i]][1, 2])
+            }
           }
-          # Extract morphological features:
-          for(i in 1:length(osnd_all)){
+        
+  
+          for(i in 1:length(osnd_all)){                                                                      # Extract morphological features
             osnd_all[[i]]$y <- osnd_all[[i]]$y - osnd_all[[i]]$y[1]
           }
           features <- feature_extract(oa = osnd_all, p = pulse, pw = polyWave)
           
-          # Add first four columns to beat final:
-          beat_final <- cbind(beat_orig[1:nrow(beat_final), 1:4], beat_final)
-          # Calculate differnces in OSND
-          osnd_fits <- osnd_fit(beat_final, ppg, plot = F)    
           
-          # Output:
-          if(ps == 1){
+          beat_final <- cbind(beat_orig[1:nrow(beat_final), 1:4], beat_final)                                # Finalise model outputs (add first four columns)
+          
+          if(run_hed == TRUE){
+            osnd_fits <- osnd_fit(beat_final, ppg, plot = F)                                                 # Calculate model error in recapitulation of fiducial points (OSND)
+          }
+          
+      
+          if(ps == 1){                                                                                       # All measures from time series 1-4 are outputted in turn for each participant
             if(pr == 1){otpt <- 1}else{otpt <- 2}
           }else{
             if(pr == 1){otpt <- 3}else{otpt <- 4}
@@ -284,15 +358,7 @@ for(run in 1:length(Participants)){
         }
       }
       
-      # Plotting average waves of 0mg vs 2mg (pair 1):
-      plot(Outputs[[1]][[6]], type = "l", col = "red", xlim = c(100, 500))    
-      lines(Outputs[[2]][[6]])
-      # Plotting average waves of 0mg vs 2mg (pair 2):
-      plot(Outputs[[3]][[6]], type = "l", col = "red", xlim = c(100, 500))    
-      lines(Outputs[[4]][[6]])
-      
-      AllOutputs[[run]] <- Outputs
-      return <- NULL
+      AllOutputs[[run]] <- Outputs                                                                           # Each participant output list is aggregated into a parent list
       
     },
     error = function(e){
@@ -313,34 +379,28 @@ for(run in 1:length(Participants)){
   
 }
 
-# Check Errors:
-non_null_names <- which(!sapply(errors, is.null))
+
+PlotRejects(rejected_waves_list1, rejected_waves_list3)                                                      # Plot number of waves post cleaning and rejected waves
+PlotWavesCarriedForward(waves_carried_forward1, waves_carried_forward3)
+
+non_null_names <- which(!sapply(errors, is.null))                                                            # Check for any errors (participants who failed to run)
 errors <- errors[non_null_names]
 names(errors) <- non_null_names
 print(errors)
 
-# Plot waves carried over and rejected waves:
-PlotRejects(rejected_waves_list1, rejected_waves_list3)
-PlotWavesCarriedForward(waves_carried_forward1, waves_carried_forward3)
+save(AllOutputs, file = "~/Desktop/AllOutputs.RData")                                                        # Save main outputs (morphological features + HED model outputs)
 
-# Check Outputs:
 
-# e.g AllOutputs[[11]][[4]][[6]]  = participant 11, time series 4, avWave
+save(rejected_waves_list1, file = "~/Desktop/rejected_waves_list1.RData")                                    # Save additional outputs
+save(rejected_waves_list3, file = "~/Desktop/rejected_waves_list3.RData")
 
-# last two double-brackets key:
+save(waves_carried_forward1, file = "~/Desktop/waves_carried_forward1.RData")
+save(waves_carried_forward3, file = "~/Desktop/waves_carried_forward3.RData")
 
-# [[i]][[1]] == beat_final
-# [[i]][[2]] == features
-# [[i]][[3]] == fit_check
-# [[i]][[4]] == osnd_fits
-# [[i]][[5]] == osnd_all
-# [[i]][[6]] == avWave
-# [[i]][[7]] == osnd (of average)
-# [[i]][[8]] == pulse
-# [[i]][[9]] == polyWave
+save(ibis_0mg1, file = "~/Desktop/ibis_0mg1.RData")
+save(ibis_0mg2, file = "~/Desktop/ibis_0mg2.RData")
+save(ibis_2mg1, file = "~/Desktop/ibis_2mg1.RData")
+save(ibis_2mg2, file = "~/Desktop/ibis_2mg2.RData")
 
-# 2mg: i = 1 and i = 3
-# 0mg: i = 2 and i = 4 
 
-# e.g
-plot(AllOutputs[[11]][[4]][[6]])
+# Refer to analysis script for further analysis of these outputs
