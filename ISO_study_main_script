@@ -160,16 +160,17 @@ for(run in c(1:length(Participants))){
                                       ((waveLen*15 -9)-142)/(samplingRate*10), by = 1/(samplingRate*10)))  
             average <- cbind(average, avWave)
             colnames(average)[1] <- "x"
-            ggplot(data = pulse_stacked, aes(x, values, col = wave_ID), col = "black") +
+            pl <- ggplot(data = pulse_stacked[-which(is.na(pulse_stacked[, 3])), ], aes(x, values, col = wave_ID), col = "black") +
               scale_color_manual(values = rep("black", ncol(pulse))) +  
               geom_line(size = 1.5, alpha = ((1/length(wuv$wX)*10)-(1/length(wuv$wX)))) + 
-              geom_line(data = average, aes(x, avWave), size = 1.125, color = "red") +                       # y axis boundaries (ylim) will vary based on source data    
+              geom_line(data = average[-which(is.na(average[, 2])), ], aes(x, avWave), size = 1.125, color = "red") +                       # y axis boundaries (ylim) will vary based on source data    
               theme(legend.position = "none") + labs( y= "PPG Output", x = "Time (Seconds)") + 
-              xlim(-0.1, 0.75) +                                                                             # + xlim(c(pulse$x[max(which(is.na(avWave)))], pulse$x[length(avWave)])) + ylim(range(avWave[!is.na(avWave)]*1.5)) 
+              # xlim(-0.1, 0.75) +                                                                             # + xlim(c(pulse$x[max(which(is.na(avWave)))], pulse$x[length(avWave)])) + ylim(range(avWave[!is.na(avWave)]*1.5)) 
               theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                     panel.background = element_blank(), axis.line = element_line(colour = "black"), 
                     axis.title = element_blank(), 
-                    axis.text = element_text(size = 24)) + ylim(-0.6, 1.6)
+                    axis.text = element_text(size = 24)) # + ylim(-0.6, 1.6)
+            print(pl)
           }
           
           
