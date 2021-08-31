@@ -53,7 +53,7 @@ ibis_2mg2 <- list()                 #     "         "
 
 
 
-for(run in c(1:length(participants))){  
+for(run in c(1:length(Participants))){  
   
   errors[[run]] <- tryCatch(
     
