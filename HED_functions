@@ -6,15 +6,15 @@ config.rate = 0.85
 const.pi = 3.1415926535897932384626433
 
 
-#Iso fitting funcs:
+# HED functions:
 
-# 1. GetParticipants
-# 2. GetDirec
-# 3. GetPairs
-# 4. Undetrend
-# 5. FactorAdjust
-# 6. OffsetAdjust
-# 7. FindUndetrendingParams
+# 1. GetParticipants (ISO dataset specific)
+# 2. GetDirec (ISO dataset specific)
+# 3. GetPairs (ISO dataset specific)
+# 4. Undetrend (ISO dataset specific)
+# 5. FactorAdjust (ISO dataset specific)
+# 6. OffsetAdjust (ISO dataset specific)
+# 7. FindUndetrendingParams (ISO dataset specific)
 # 8. AddOutput
 # 9. FindStartParams
 # 10. FindWithinParams
@@ -146,22 +146,55 @@ FactorAdjust <- function(data, factorCutoff, ppg, u, beat, a., test, gs=gs, beat
   
   # Calculate the Gradient of the tail of the beat:
   tail <- c(data[nrow(data), 2], data[nrow(data)-1, 2], data[nrow(data)-2, 2], data[nrow(data)-3, 2], 
-            data[nrow(data)-4, 2])    
+            data[nrow(data)-4, 2])  
+  
+  # This will determine whether the gradient is initially found to be positive or not, which will influence the events that follow. 
+  
+  # So make initial assessment based on last 5 values. 
+  # If the gradient of last 5 values is positive, use values from before the last 5. 
+    # If the last 5 were positive due to noise, this will make sure it is counted as negative from that point on. 
+    # If the last 5 were genuinely positive, then the positivity should extend beyond the last 5
+  # If the gradient of last 5 values is negative, use the last values. 
+    # Don't tend to see falsely negative values, only falsely positive. 
+    # Choosing values earlier than the last 5 
+  
+  # There are actually two criteria I'm now using to iterate the while loop. The first is the gradient, the second 
+  # is a check to make sure the minimum of the data segment is not in the middle 50% i.e due to the notch. 
+  
+  # This means that the second gradient check and subsequent ifelse statements are necessary, because positive and negative gradients
+  # could enter the while loop if only the low notch criteria is met. 
+  
+  # As far as I can tell, there needs to be an initial check of the last 5 data segments to determine which section of the tail will then
+  # be iterated on in the while loop. 
+  
+  # The reasoning for this is as follows:
+  
+  #  Basically, at the end of waves you can have 4 shapes:
+     # 1. prolonged negative slope (morphologically normal)
+     # 2. prolonged positive slope (due to heavy detrending)
+     # 3. ~5 positive slope coming out of the notch, followed by ~5 negative slope as a rather short tail i.e an n shape (these tend to be ISO waves as they are short due to high HR) 
+     # 4. ~5 positive slope at the end of the tail, preceded by a prolonged negative slope i.e a v shape (due to tail noise)
+  
+  # With an initial assessment determining the iterations that follow:
+  # 1. and 2. will be processed the same regardless of which of the last 10 datapoints the gradient is taken from
+  # 3. In the initial 'last 5' datapoint assessment, these will be found to be negative and thus will continue being iterated on based on the last 5 datapoints (which is what we want)
+  # 4. In the initial 'last 5' datapoint assessement, these will be found to be positive, and so will be iterated on based on NOT the last 5 datapoints (also what we want)
+  
   tail <- rev(tail)
   xx. <- 1:length(tail)
   y. <- lm(tail~xx.)
   # Adjust the factor value until the gradient of the tail reaches an appropriate threshold, and the min value is not the notch:
-  factor_value <- 1  # was 1.01
+  factor_value <- 1  
   while(y.[[1]][2] > factorCutoff | (which.min(data[, 2]) > quantile(1:nrow(data))[[2]] & which.min(data[, 2]) < quantile(1:nrow(data))[[4]]) ){    
     if(factor_value < 0.7){break}
     factor_value <- factor_value - 0.01
     ppg2 <- ppg
     ppg2[, 2] <- u(ppg,factor=factor_value,offset=1)
-    beatTime <- beat[test + a., 1]   # same adjustments made here as first two lines
-    nextTime <- beat[test + (a. + 1), 1] 
+    #beatTime <- beat[test + a., 1]   # same adjustments made here as first two lines
+    #nextTime <- beat[test + (a. + 1), 1] 
     seg <- c(which(ppg$`time (s)` ==  beatTime), 0, which(ppg$`time (s)` == nextTime))
     data <- gs(ppg2,seg)
-    if(plot == TRUE){plot(data)}
+    if(plot == TRUE){plot(data, pch = 19)}
     # If the gradient is positive, ignore the last 5 values... 
     if(y.[[1]][2] > 0){
       tail <- c(data[nrow(data)-5, 2], data[nrow(data)-6, 2], data[nrow(data)-7, 2], data[nrow(data)-8, 2], 
@@ -242,7 +275,7 @@ FindUndetrendingParams <- function(direc, gs = model2.GetSegment, u = UnDetrend,
     
       t_value <- c()
       for(i in 1:4){
-         print(i)
+        print(i)
         # We don't know the exact time of onset of iso at this point, but we can infer the IBI from beat and identify
         # waves around the minimum point:
         
@@ -266,7 +299,8 @@ FindUndetrendingParams <- function(direc, gs = model2.GetSegment, u = UnDetrend,
         # Since we are using a less robust method to find beats, there is a chance of multi-beat segments:
         # Detect them and choose the next segment if so...:
         a. <- 0
-        while (nrow(data) > sr*1.5 | nrow(data) < (0.375*sr)){
+        while (nrow(data) > sr*1.5 | nrow(data) < (0.375*sr) | 
+               sum(c(order(data[, 2], decreasing = T)[1:5][-1], order(data[, 2], decreasing = T)[1:5][1]) > 20) > 0 ){    # this line insures that the max (5) points of the data are not far apart in time (as would be the case if two peaks were present)
           beatTime <- beat[test + a., 1]  
           nextTime <- beat[test + (a. + 1), 1]
           seg <- c(which(ppg$`time (s)` ==  beatTime), 0, which(ppg$`time (s)` == nextTime))
@@ -277,7 +311,7 @@ FindUndetrendingParams <- function(direc, gs = model2.GetSegment, u = UnDetrend,
           a. <- a. - 1
         }
         
-        if(plot == TRUE){plot(data)}
+        if(plot == TRUE){plot(data, pch = 19)}
         t_value[i] <- fa(data, factorCutoff, ppg, u, beat, a., test, gs, beatTime, nextTime, plot = p)
       }
 
@@ -387,7 +421,7 @@ FindStartParams <- function(batch_number, beats_in, beat, ppg, gs = model2.GetSe
     amp <- max(data[, 2]) - min(data[, 2])
     constant <- 0.1092254*amp
     baseline <- min(data[,2]) - constant    
-    residue <- e(data[,2], ppg[seg[1]-1,2], -0)     
+    residue <- e(data[,2], ppg[seg[1]-1,2], -0) ## - 0?     
     
     count <- nrow(data)
     excess <- 1:count * 0.0
@@ -397,7 +431,7 @@ FindStartParams <- function(batch_number, beats_in, beat, ppg, gs = model2.GetSe
     }
     rm(count)
     rm(j)
-    #plot(data[,1],excess, type = "l")
+    # plot(data[,1],excess, type = "l")
     par <- 1:10 * 0.
     par[1] = baseline
     residue <- excess  
@@ -406,44 +440,44 @@ FindStartParams <- function(batch_number, beats_in, beat, ppg, gs = model2.GetSe
     peak.w <- which(data[,1] > beat[i,1]-0.2 & data[,1] < beat[i,1]+0.2)  
     peak.t <- data[peak.w,1]
     peak.y <- residue[peak.w]
-    #plot(data[,1],excess)   
-    #lines(peak.t,peak.y)
+    # plot(data[,1],excess)   
+    # lines(peak.t,peak.y)
     par[3] <- max(peak.y)      # height of the S peak
     par[2] <- peak.t[which(peak.y==par[3])]   # timing of the S peak
     par[4] <- 0.25    # width of the S-peak, a priori
     rm(peak.w,peak.t,peak.y)
     residue <- sep(data[,1],residue,par[2:4])
-    #plot(data[,1],excess)
-    #lines(data[,1],residue)  
+    # plot(data[,1],excess)
+    # lines(data[,1],residue)  
     
     # D peak
     peak.w <- which(data[,1] > beat[i,1]+0.3 & data[,1] < beat[i,1]+0.6)  # this finds a range in where to find the peak of d
     peak.t <- data[peak.w,1]     # this finds the time corresponding to the peak
     peak.y <- residue[peak.w]
-    #plot(data[,1],excess)   
-    #lines(peak.t,peak.y)
+    # plot(data[,1],excess)   
+    # lines(peak.t,peak.y)
     par[6] <- max(peak.y)     
     par[5] <- peak.t[which(peak.y==par[6])]   
     par[7] <- 0.25  
     rm(peak.w,peak.t,peak.y)
     residue <- sep(data[,1],residue,par[5:7])
-    #plot(data[,1],excess)
-    #lines(data[,1],residue)
+    # plot(data[,1],excess)
+    # lines(data[,1],residue)
     
     # N peak
     t <- par[2] + c(0.25,0.75) * (par[5]-par[2])
     peak.w <- which(data[,1] > t[1] & data[,1] < t[2])
     peak.t <- data[peak.w,1]
     peak.y <- residue[peak.w]
-    #plot(data[,1],excess)   
-    #lines(peak.t,peak.y)
+    # plot(data[,1],excess)   
+    # lines(peak.t,peak.y)
     par[9] <- max(peak.y)
     par[8] <- peak.t[which(peak.y==par[9])]
     par[10] <- 0.25
     rm(peak.w,peak.t,peak.y,t)
     residue <- sep(data[,1],residue,par[8:10])
-    #plot(data[,1],excess)
-    #lines(data[,1],residue)
+    # plot(data[,1],excess)
+    # lines(data[,1],residue)
     
     # Store parameters
     w <- seg[1]:seg[3]
@@ -608,7 +642,7 @@ PlotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.R
     xNext <- ppg[seg[3], 1]
     rm(seg)
     temp<-model2.Rebuild2(data, yPrev, as.double(beat2[i,]),TRUE)    
-    plot(data[, 1], data[, 2], ylim = c(-400, 2500), main = paste(c("batch", k, "wave", i), collapse = " "))   # ylim = c(76, 86)
+    plot(data[, 1], data[, 2], ylim = c(beat2$Baseline[1]*1.5, max(data[, 2]*1.2)), main = paste(c("batch", k, "wave", i), collapse = " "))   # ylim = c(76, 86)
     lines(data[,1],temp)
     # Plot baselines:
     lines(c(xPrev, (beat2[i, 3]  + (1*beat2[i, 6]))), rep(beat2[i, 1], 2))   
@@ -632,11 +666,107 @@ PlotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.R
   }
 }
 
+GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F){
+  
+  if(pr == 1){pr = 0}
+  
+  for(i in 1:beats_in){
+    seg <- c(beat[i,3],0,beat[i,4])  
+    data <- model2.GetSegment(ppg,seg)
+    yPrev <- ppg[seg[1]-1,2]
+    xPrev <- ppg[seg[1]-1, 1]
+    xNext <- ppg[seg[3], 1]
+    rm(seg)
+    temp<-model2.Rebuild2(data, yPrev, as.double(beat2[i,]),TRUE)    
+    fit <- model2.Rebuild2(data, yPrev, as.double(beat2[i,]),TRUE) 
+    
+    # Create waves dataframe:
+    waves <- data.frame(data)
+    waves <- cbind(data, fit)
+    par <- as.double(beat2[i,])
+    par[c(7:8, 10:11)] <- 0
+    temp<-model2.Rebuild2(data,yPrev,par,TRUE)
+    waves <- cbind(waves, temp)
+    par <- as.double(beat2[i,])
+    par[c(4:5, 7:8)] <- 0
+    temp<-model2.Rebuild2(data,yPrev,par,TRUE)
+    waves <- cbind(waves, temp)
+    par <- as.double(beat2[i,])
+    par[c(4:5, 10:11)] <- 0
+    temp<-model2.Rebuild2(data,yPrev,par,TRUE)      
+    waves <- cbind(waves, temp)
+
+    # Baselines can be added as line segments with geom_segment:
+    b1y <- beat2[i, 1]
+    b1x <-  c(xPrev, (beat2[i, 3]  + (1*beat2[i, 6])))  
+    b2x <- c((beat2[i, 3]  + (1*beat2[i, 6])), xNext)
+    b2y <-  beat2[i, 2]
+    
+    # Make component waves + fit into splines:
+    sfunction <- splinefun(1:nrow(waves), fit, method = "natural")
+    fit2 <- sfunction(seq(1, nrow(waves), 0.1), deriv = 0) 
+    par <- as.double(beat2[i,]) 
+    par[c(7:8, 10:11)] <- 0
+    sys<-model2.Rebuild2(data,yPrev,par,TRUE)
+    sfunction <- splinefun(1:nrow(waves), sys, method = "natural")
+    sys2 <- sfunction(seq(1, nrow(waves), 0.1), deriv = 0) 
+    par <- as.double(beat2[i,])
+    par[c(4:5, 10:11)] <- 0
+    dias<-model2.Rebuild2(data,yPrev,par,TRUE)      
+    sfunction <- splinefun(1:nrow(waves), dias, method = "natural")
+    dias2 <- sfunction(seq(1, nrow(waves), 0.1), deriv = 0) 
+    par <- as.double(beat2[i,])
+    par[c(4:5, 7:8)] <- 0
+    R1<-model2.Rebuild2(data,yPrev,par,TRUE)
+    sfunction <- splinefun(1:nrow(waves), R1, method = "natural")
+    R12 <- sfunction(seq(1, nrow(waves), 0.1), deriv = 0) 
+
+    # Build waves_stacked 
+    time <- waves[, 1]
+    time <- seq(from = time[1], to = time[length(time)], length.out = length(fit2))
+    fit2 <- data.frame(time, fit2)
+    fit2 <- cbind(fit2, rep("fit", nrow(fit2)))
+    sys2 <- data.frame(time, sys2)
+    sys2 <- cbind(sys2, rep("systolic wave", nrow(sys2)))
+    dias2 <- data.frame(time, dias2)
+    dias2 <- cbind(dias2, rep("2nd reflectance wave", nrow(dias2)))
+    R12 <- data.frame(time, R12)
+    R12 <- cbind(R12, rep("1st reflectance wave", nrow(R12)))
+    colnames(fit2) <- c("x", "values", "Wave")
+    colnames(sys2) <-  c("x", "values", "Wave")
+    colnames(dias2) <-  c("x", "values", "Wave")
+    colnames(R12) <-  c("x", "values", "Wave")
+    waves_stacked_final <- rbind(fit2, sys2, dias2, R12)
+    
+    # stack data:
+    data_stacked <- data.frame(data)
+    data_stacked <- cbind(data_stacked, rep("data"))
+    colnames(data_stacked) <- c("x", "values", "Wave")
+    
+    # Plot! 
+    if(p == T){
+      c <- ggplot(data = waves_stacked_final, aes(x = x, y = values, col = Wave)) + geom_line(aes(size = Wave, alpha = Wave)) +
+              scale_color_manual(values = c("#03fc7b", "#03b5fc", "black", "black", "black", "#ff4242", "black")) + scale_size_manual(values = c(0.7, 0.7, 1.5, 0.7, 0.7)) + 
+              scale_alpha_manual(values = c(1, 1, 1, 1, 1)) + ylab("PPG Signal") + xlab("Time") + geom_point(data = data_stacked) + 
+              geom_segment(aes(x = data[1, 1], y = b1y, xend = b1x[2], yend = b1y, colour = "black")) + geom_segment(aes(x = b2x[1], y = b2y, xend = b2x[2], yend = b2y, colour = "black")) + 
+              theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) + 
+              theme(legend.position = "none") + ggtitle(paste0("Participant", " ", run, "\n", pr, " ", "mcg", sep = "")) # + ylim(-350, 1600) 
+    }else{
+        ggplot(data = waves_stacked_final, aes(x = x, y = values, col = Wave)) + geom_line(aes(size = Wave, alpha = Wave)) +
+        scale_color_manual(values = c("green", "blue", "black", "black", "black", "red", "black")) + scale_size_manual(values = c(0.7, 0.7, 1.5, 0.7, 0.7)) + 
+        scale_alpha_manual(values = c(1, 1, 1, 1, 1)) + ylab("PPG Signal") + xlab("Time") + geom_point(data = data_stacked) + 
+        geom_segment(aes(x = b1x[1], y = b1y, xend = b1x[2], yend = b1y, colour = "black")) + geom_segment(aes(x = b2x[1], y = b2y, xend = b2x[2], yend = b2y, colour = "black")) + 
+        theme(legend.position = "none") # + ylim(-1000, 2000)
+    }
+  }  
+}
+
+
 
 osnd_fit <- function(bf = beat_final, ppg, gs = model2.GetSegment, r = model2.Rebuild2, sf = splinefun, dp = diast_pk, oa = osnd_of_average, sr = samplingRate, plot = FALSE){
   
   osnd_diff <- list()
-  for(i in 1:nrow(bf)  ){  #nrow(bf)  
+  for(i in 1:nrow(bf)   ){  #nrow(bf)  
     # Find the correct data segments and corresponding model fit:
     seg <- c(bf[i,3],0,bf[i,4])  
     data <- gs(ppg,seg)
@@ -663,7 +793,7 @@ osnd_fit <- function(bf = beat_final, ppg, gs = model2.GetSegment, r = model2.Re
     rm(tmp)
     osnd_fit <- oa(fit, dp = dPeak, diff = 0, sr = sr, plot = F)
     # Find OSND of data:
-    tmp <- diast_pk(avw = dat, sr = sr, scale = T)  
+    tmp <- dp(avw = dat, sr = sr, scale = T, dias_param = bf[i, 10]*sr*10)  # why not make dias_param also informed by the model here? instead of null? try it!
     dPeak <- tmp[1]
     xShift <- tmp[2]
     rm(tmp)
@@ -1152,7 +1282,7 @@ model2.FIX_PAR3 <- function(time, within_beat_params, across_beat_params, debug=
 
   # Config.rate
   if(across_beat_params[6] > 0.95){
-    diff <- across_beat_params[6] - 0.95   
+    diff <- across_beat_params[6] - 0.95
     penalty <- penalty + 10^7*diff*diff
     p[12] <- 10^7*diff*diff
     across_beat_params[6] <- 0.95
@@ -1189,11 +1319,39 @@ model2.FixParams3 <- function(data,params, across_beat_params = NULL, debug=FALS
 
 
 # Make Simplex 2 (for across beat parameters only):
-simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, optional=NULL,debug=FALSE, beat_vector = beat_vector, beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w){
-  if(debug){print("MakeSimplex -- debug")}                        
-  nPar <- length(param)
-  nScale <- length(inScale)
-  if (nScale == 0)
+simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, optional=NULL,debug=FALSE, beat_vector = beat_vector,
+                                 beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w){
+  ########################################################################################################################################
+  # MakeSimplex2 iterates on the across-beat starting parameters, refining them to give to give the simplex a good starting position. 
+  
+  # Inputs: 
+  # data ()
+  # param
+  # f
+  # inScale
+  # directions
+  # inTol
+  # optional
+  # debug
+  # beat_vector
+  # beat
+  # renal_param
+  # dias_param
+  # sys_time
+  # w
+  
+  
+  # Outputs:
+  # ?? ()
+  ########################################################################################################################################
+  
+  if(debug){print("MakeSimplex -- debug")}                # this seems unecessary now..         
+  
+  nPar <- length(param)                  # define number of parameters
+  nScale <- length(inScale)               # what is inscale?
+  
+  
+  if (nScale == 0)       # Not sure what this is doing.. 
   {
     scale <- 1:nPar * 0 + 1
   } else if (nScale == 1){
@@ -1204,43 +1362,58 @@ simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, 
     #print("Invalid scale vector length")
     return("Error: Invalid scale vector length")
   }
-  if (length(inTol) == 1 & inTol > 0){
+  
+  
+  if (length(inTol) == 1 & inTol > 0){   # If no tolerance is provided, the tol is defined as the value of the point / vertex provided
     tol <- inTol[1]
   } else {
-    tol <- min(1,f(data,param, beats = beat_vector, beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w))  
+    tol <- min(1,f(data,param, beats = beat_vector, beat = beat, renal_param = renal_param,
+                   dias_param = dias_param, sys_time = sys_time, w = w))  
   }
   
   
-  chiSq <- 1:(nPar+1) * 0.0
-  chiSq[1] <- f(data,param,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)   # ChiSq[1 is the fit when no parameters are changed... 
-  if (debug){ print(paste("Root chi-squared:",chiSq[1]))}
+  chiSq <- 1:(nPar+1) * 0.0    # Creating a vector of ChiSq values... 
   
-  result <- matrix(nrow=nPar+1,ncol=nPar)
-  result[1,] <- as.double(param)
+  chiSq[1] <- f(data,param,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param,    # ChiSq[1 is the fit when no parameters are changed... 
+                dias_param = dias_param, sys_time = sys_time, w = w)                                            
   
-  useDirections = !is.null(directions)
-  if (useDirections){ useDirections <- nrow(directions) == nPar & ncol(directions) == nPar}
+  if (debug){ print(paste("Root chi-squared:",chiSq[1]))}   # is this line still necessary?
+  
+  result <- matrix(nrow=nPar+1,ncol=nPar)      # Create a matrix of parameters, with as many columns as parameters, and nPar + 1 rows (each will be one point of the simplex)
+  result[1,] <- as.double(param)    # Fill the first row with the inputted parameters (our best guess so far)... 
+  
+  useDirections = !is.null(directions)         # I don't think we ever do use directions...?
+  
+  if (useDirections){ useDirections <- nrow(directions) == nPar & ncol(directions) == nPar}     # ditto, we are not using directions.. but is it necessary?
   
   
-  for (i in c(5, 6, 8, 9, 11, 12)){   
-    if (debug){ print(paste("Parameter",i)) }
+  for (i in c(5, 6, 8, 9, 11, 12)){                  # Create a for loop for each of the across beat parameters (the ones we are refining)
     
-    tParam <- param
+    if (debug){ print(paste("Parameter",i)) }  # We are not debugging now so ?necessary
+    
+    tParam <- param    # create a new vector of parameters to be tweaked / tested, tParam
     
     # Pick a direction
-    delta <- 1:nPar * 0
+    delta <- 1:nPar * 0              # delta is a finite increment by which to increase or decrease a given parameter value. We create a vector for it here. 
+    
     if (useDirections){
-      delta <- scale[i] * directions[i,]
+      delta <- scale[i] * directions[i,]      # this if is redunant since we are not using directions...
     } else {
-      delta[i] <- scale[i]
+      delta[i] <- scale[i]       # scale relates to inScale, somehow.. and is used to set the delta level
     }
     
-    tParam <- param - delta                                   # This part tries tweaking each parameter up or down, 
-    chiSqMinus <- f(data,tParam,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)            # tParam = test parameter. 
-    tParam <- param + delta                                   # The chisquare (goodness of fit) is calculated for each direction, 
-    chiSq[i+1] <- f(data,tParam,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)            # the direction with the smaller value is chosen. 
+    tParam <- param - delta                                   # This part tries tweaking each parameter up or down
     
-    if (debug){
+    chiSqMinus <- f(data,tParam,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param,  # we run the test parameters through chisq3 to get a chisq value for them
+                    dias_param = dias_param, sys_time = sys_time, w = w)         
+    
+    tParam <- param + delta                                   # This time delta is added rather than subtracted, and again the resulting Chisq change is found
+    
+    chiSq[i+1] <- f(data,tParam,optional=optional, beats = beat_vector, beat = beat, renal_param = renal_param,
+                    dias_param = dias_param, sys_time = sys_time, w = w)            
+    
+    
+    if (debug){                       # redundant now? need to go through specifically looking for debug functions and get a sense of what it is doing
       print("Select direction:")
       print(paste("chi^2(",param[i] - delta[i],") =",chiSqMinus))
       print(paste("chi^2(",param[i],") =",chiSq[1]))
@@ -1254,7 +1427,7 @@ simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, 
       chiSq[i+1] <- chiSqMinus
     }
     
-    iKill <- 10    
+    iKill <- 10       # defining the number of iterations that a given parameter will be refined over
     
     if (chiSq[i+1] < chiSq[1]){         # If the new fit is better than the old fit (with no parameters changed), continue to go in the direction that improved the fit
       if (debug){ print("Extending as best point") }
@@ -1332,6 +1505,12 @@ simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, 
   if (debug){ print("/MakeSimplex") }
   return(result)
 }
+
+# [20:15, 19/06/21] Simon Williamson
+# Thanks Craig, sorry it's taken me a while to get back round to this. 
+# I think I understand how things are working from what you've explained. So I suppose the question is why have tolerance at all? Why not have each vertex extend or shrink until it is below the original vertex, rather than below the original vertex + tol?
+# Trying to answer this myself, I suppose there's the possibility that some parameters cannot be improved upon, in which case the test parameter can at least shrink until it is minimally worse than the original? And that minimum is defined by tol?
+
 
 
 # Make simplex 3 (for within-beat parameters only)
@@ -1476,35 +1655,55 @@ simplex.MakeSimplex3 <- function(ppg, param,f,inScale, directions=NULL, inTol=-1
 
 
 
-simplex.Run2 <- function(data = ppg,simplexParam = mat, f = model2.ChiSq3, optional=NULL, beat_vector = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w, run = NULL){
+simplex.Run2 <- function(data = ppg,simplexParam = mat, f = model2.ChiSq3, optional=NULL, beat_vector = beat_vector, ms = simplex_iterations, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w, run = NULL){
+  ########################################################################################################################################
+  # Simplex.Run2 is the function that intiates the process of simplex relfection through the multi-dimensional landscape. 
   
-  MAX_STEP <- 5000                                               # The number of steps to iterate through
-  FTOL <- 1e-5                                  
+  # Inputs: 
+  # data ()
+  # simplexParam (a matrix... )
+  # f (the function used to assess goodness of fit by comparing the fitted wave to the original data wave)
+  # optional 
+  # beat_vector (an index of beats to be modeled and their x-coordinates to extract from the PPG time series)
+  # renal_param (the intially identified renal timing, used as an anchor point for the model)
+  # dias_param (the initially identified diastolic timing, used as an achor point for the model / about which the model is constrained)
+  # sys_time (the timing of systole (about which the model is constrained))
+  # w ()
+  # run (indicates which simplex run is being conducted when printed)
   
-  debugRtol <- 1:(MAX_STEP+1) * 0.0
+  
+  # Outputs:
+  # Basically the set of parameters which best optimizes the function model2.ChiSq
+  ########################################################################################################################################
+  MAX_STEP <- ms                                               # Maximum number of allowed function evaluations (numerical recipes)
+  FTOL <- 1e-5                                  # Tolerance, or fraction of tolerance possibly related to machine precision - need to clarify
+  
+  debugRtol <- 1:(MAX_STEP+1) * 0.0             # Not sure if we use any of these at any point... 
   debugMin <- 1:(MAX_STEP+1) * 0.0
   debugMax <- 1:(MAX_STEP+1) * 0.0
   
-  result <- simplexParam                         # Now pass in the 66*66 matrix
-  nPar <- ncol(result)                           
-  chiSq <- 0:nPar * 0.0
-  for (i in 1:(nPar+1)){                                    # Find out the ChiSq value for each row from result
-    chiSq[i] <- f(data, params = NULL, optional=NULL, a = result[i, ], beats = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
-  }
+  result <- simplexParam                         # Passing in the 66*66 matrix, which will be the output once iterated on
+  nPar <- ncol(result)                      
+  chiSq <- 0:nPar * 0.0             # A separate chisq value exists for each parameter, so 66... 
+  
+  for (i in 1:(nPar+1)){                                    # Find out the ChiSq value for each row from result, there are 66 + 1 rows
+    chiSq[i] <- f(data, params = NULL, optional=NULL, a = result[i, ], beats = beat_vector,
+                  renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
+  }                         # Having this vector gives us the values of each point in the simplex
   
   for (iStep in 1:MAX_STEP){                             # beginning of downhill simplex
     extrema <- simplex.SortHighLow(chiSq)                # Finds the results which give the highest, 2nd highest and lowest ChiSq
     low <- extrema[1]
-    nHigh <- extrema[2]
+    nHigh <- extrema[2] 
     high <- extrema[3]
     
-   if(!is.null(run)){
+   if(!is.null(run)){        # just prints run number and iteration number, so you have an idea of it's progress when running it
       print(run)
     }
     print(iStep)
     
-    chiSqMax <- chiSq[high]                        
-    chiSqMin <- chiSq[low]                  
+    chiSqMax <- chiSq[high]                     # redefine highest and lowest points...
+    chiSqMin <- chiSq[low]                      # These should be the ChiSq values for individual rows (the best and worst points), so how can it be compared to the 'score' that resresents the entire new simplex?
     
     print(chiSqMax)
     
@@ -1515,26 +1714,31 @@ simplex.Run2 <- function(data = ppg,simplexParam = mat, f = model2.ChiSq3, optio
     if (rtol < FTOL){
       bestParam <- result[low,]                     # Presumably if the difference in ChiSq (max vs min) is significant, 
       result[low,] <- result[1,]                    # the result that was changed to give the lowest ChiSq gets designated 'best Param'
-      result[1,] <- bestParam                       # The changed parameter gets upgraded to first row (swapped with what is there currently)
-      return(result)
+      result[1,] <- bestParam                       # The best performing row gets upgraded to first row (swapped with what is there currently)
+      return(result) 
     }
-    debugRtol[iStep] <- rtol
+    
+                                                     # So at this point you have input the matrix, identified chiSq values for each row, and moved the row 
+                                                     # that generates the best Chisq to the top (at least for iteration 1). 
+    
+    debugRtol[iStep] <- rtol                         # ? necessary lines?
     debugMin[iStep] <- chiSqMin
     debugMax[iStep] <- chiSqMax
     
-    factor <- -1
-    node <- simplex.HypoCentre(result,high)        # Hypocentre outputs all the parameters that are not the worst
-    apex <- result[high,]                          # Apex must be the worst parameter
-    test <- node - (apex - node)                   # This represents the flipping of the triangle; the whole parameter set is reversed in the direction away from the worst ChiSq point (literally subtracting one row from another here)
-    score <- f(data, params = rep(0, 12),optional=optional, a = test, beats = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
+    factor <- -1       # not sure what this does
+    node <- simplex.HypoCentre(result,high)        # Hypocentre outputs all the parameters that are not the worst  - IS THIS A SINGLE ROW OR A MATRIX?
+    apex <- result[high,]                          # Apex is the worst row / point on the simplex
+    test <- node - (apex - node)                   # This represents the flipping of the triangle; the whole parameter set is reversed in the direction away from the worst ChiSq point (literally, we are subtracting the difference between each row and the worst row from each row, causing all rows to be less similar to the worst ro)
+    score <- f(data, params = rep(0, 12),optional=optional, a = test, beats = beat_vector,
+               renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)   # QUESTION: is this a single value? Does it evaluate every row of the simplex?
     
-    if (score < chiSqMin){                          # If flipping improves the ChiSq, try extending further in the same direction
+    if (score < chiSqMin){                          # If flipping improves the ChiSq, try extending further in the same direction (increase the scale by 2) i.e reflection and expansion
       test2 <- node - 2 * (apex - node)
       score2 <- f(data, params = rep(0, 12),optional=optional, a = test2, beats = beat_vector, renal_param = renal_param, dias_param = dias_param, sys_time = sys_time, w = w)
       if (score2 >= score){                       # If reflecting a further distance is better than reflecting alone, do that
         # Reflect
         #print(paste("Reflecting",high,": chi^2 ",chiSqMax,"->",score,sep=""))
-        result[high,] <- test
+        result[high,] <- test       # test is replacing one row, so is test just one row?
         chiSq[high] <- score
       } else {
         # Reflect and grow
@@ -1582,9 +1786,9 @@ simplex.Run2 <- function(data = ppg,simplexParam = mat, f = model2.ChiSq3, optio
   
   chiSqMax <- chiSq[extrema[3]]
   chiSqMin <- chiSq[low]
-  rtol <- 2 * (chiSqMax - chiSqMin)/(chiSqMax + chiSqMin + 1e-10)
+  rtol <- 2 * (chiSqMax - chiSqMin)/(chiSqMax + chiSqMin + 1e-10)   # Why does rtol need to be redefined here?
   debugRtol[MAX_STEP+1] <- rtol
-  debugMin[MAX_STEP+1] <- chiSqMin
+  debugMin[MAX_STEP+1] <- chiSqMin      # Are these debug lines needed?
   debugMax[MAX_STEP+1] <- chiSqMax
   # plot(debugMax,type='l')
   # lines(debugMin)
@@ -1641,8 +1845,14 @@ simplex.SortHighLow <- function(vec_ChiSq){
 
 PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
   
+  if(length(rejected_waves_list3) > 0){
+    len <- 2
+  }else{
+    len <- 1
+  }
+  
   participant_extra_long_waves <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1681,7 +1891,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
 
   
   participant_extra_short_waves <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1719,7 +1929,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
   }
   
   participant_double_segments <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1759,7 +1969,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
   
   
   participant_systolic_endings <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1800,7 +2010,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
   
   
   participant_drops_below_o <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1840,7 +2050,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
 
   
   participant_hrsd_waves <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1880,7 +2090,7 @@ PlotRejects <- function(rejected_waves_list1, rejected_waves_list3){
 
   
   participant_outlier_waves <- c()
-  for(k in 1:2){
+  for(k in 1:len){
     
     if(k == 1){
       new_vec <- rejected_waves_list1
@@ -1975,14 +2185,17 @@ PlotWavesCarriedForward <- function(waves_carried_forward1, waves_carried_forwar
     }
   }
   
-  test_vec2 <- waves_carried_forward3
-  waves_carried_over2 <- c()
-  for(i in 1:length(test_vec2)){
-    if(!is.null(test_vec2[[i]])){
-      waves_carried_over2[i] <- test_vec2[[i]]
+  if(length(waves_carried_forward3) > 0){
+    test_vec2 <- waves_carried_forward3
+    waves_carried_over2 <- c()
+    for(i in 1:length(test_vec2)){
+      if(!is.null(test_vec2[[i]])){
+        waves_carried_over2[i] <- test_vec2[[i]]
+      }
     }
+    waves_carried_over <- c(waves_carried_over, waves_carried_over2)
   }
-  waves_carried_over <- c(waves_carried_over, waves_carried_over2)
+  
   
   # Currently representing all 2mg times series:
   hist(waves_carried_over, breaks = 30, xlim = c(0, 200))
