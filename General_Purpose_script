@@ -25,8 +25,8 @@ library(DescTools)
 library(zoo)
 library(readr)
 
-source("~/Desktop/Scripts/PPG_funcs.R")  # (alter file path as required)              
-source("~/Desktop/Scripts/iso_funcs.R")  # (alter file path as required)   
+source("~/Desktop/Scripts/PPG_processing_functions.R")    # (alter file path as required)              
+source("~/Desktop/Scripts/HED_functions.R")               # (alter file path as required)   
 
 
 
