@@ -1,4 +1,5 @@
 # PPG function list:
+
 # 1. Preproc  (note for bioradio data only)
 # 2. find_w   
 # 3. find_u_v
@@ -130,19 +131,18 @@ find_w <- function(d1p, deriv1, sp, sr){
     windowInflxX <- d1InflxX[which(d1InflxX > firstWindow[1, 1]  & d1InflxX < firstWindow[, 1][length(firstWindow[, 1])])]                     
     threshold <- quantile(firstWindow[, 2], probs=c(.95))                                                                                       # Define a threshold for finding peaks, of 0.95 
     windowPks <- which(windowInflxY > threshold)                                                                                                # Identify inflection points above the threshold as peaks
-    
                                                                                                                                                        
-    if(length(windowPks) == 2 & windowPks[2] - windowPks[1] > sr){                                                                                      # If the first two peaks indicate a heart rate < 60 bpm, 
+    if(length(windowPks) == 2 & windowInflxX[windowPks[2]] - windowInflxX[windowPks[1]] > sr){                                                                                      # If the first two peaks indicate a heart rate < 60 bpm, 
       confirmWindow <- data.frame(d1InflxX[windowPks[1]+2]:d1InflxX[windowPks[2]-2],   deriv1[d1InflxX[windowPks[1]+2]:d1InflxX[windowPks[2]-2]])       # ensure a peak between them has not been missed with the current threshold
       inflxConformY <- d1InflxY[which(d1InflxX > confirmWindow[1, 1] & d1InflxX < confirmWindow[, 1][length(confirmWindow[, 1])])]
       inflxConformX <- d1InflxX[which(d1InflxX > confirmWindow[1, 1]  & d1InflxX < confirmWindow[, 1][length(confirmWindow[, 1])])]                     # Find inflection points within the window (defined as between peaks 1 and 2)
-      threshold <- quantile(confirmWindow[, 2], probs=c(.95))       
-      missedPks <- inflxConformX[which(inflxConformY > threshold)]                                                                                      # Identify peaks above threshold
+      threshold <- max(quantile(confirmWindow[, 2], probs=c(.95)), windowInflxY[windowPks[1]]/2)     
+      missedPks <- inflxConformX[which(inflxConformY > threshold)]                                                                                      # Identify peaks above threshold (and greater than 50% of the height of the first peak)
       missedPks <- which(windowInflxX == missedPks[1])                                                                                                  # Identify the inflection point in the original window which corresponds to the missed peak 
-      windowPks[2] <- missedPks[1]                                                                                                                      # Assign the missed peak as the second peak
+      if(length(missedPks) > 0){windowPks[2] <- missedPks[1]}                                                                                                                       # Assign the missed peak as the second peak
     }
     
-    if(length(windowPks) == 2 & windowPks[2] - windowPks[1] < (sr/10)){                                                                         # Rarely, the first peak contains two inflection points above threshold, 
+    if(length(windowPks) == 2 & windowInflxX[windowPks[2]] - windowInflxX[windowPks[1]] < (sr/10)){                                                                         # Rarely, the first peak contains two inflection points above threshold, 
       windowPks <- windowPks[-2]                                                                                                                # if peaks are too close (< 1/10th of a second), the second peak is discounted
     }
     
@@ -169,6 +169,7 @@ find_w <- function(d1p, deriv1, sp, sr){
       d1InflxX <- d1InflxX[-c(1:(sr*(100/75)))]                                                                                                 # forward, resetting a. 
       d1InflxY <- d1InflxY[-c(1:(sr*(100/75)))]
       a <- -3  
+      print("skipped")
     }
     
     a <- a + 5                                                                                                                                  # Increases until two legitimate peaks are found
@@ -312,7 +313,7 @@ find_w <- function(d1p, deriv1, sp, sr){
     }                                                                                                                                           # extend the window and look again
   }       
   
-  #############Post Peak Identification Cleaning: #############
+  ############# Post Peak Identification Cleaning: #############
   
   d1wY <- predict(d1p, wX)                                                                                                                      # Find summary statistics of identified peak y-values
   m <- mean(d1wY) 
@@ -353,7 +354,7 @@ find_w <- function(d1p, deriv1, sp, sr){
 }
 
 
-find_u_v <- function(wx, wy, d1, d1p, spline, plot = FALSE){
+find_u_v <- function(wx, wy, d1, d1p, spline, sr = samplingRate, plot = FALSE){
   ########################################################################################################################################
   # FindUV identifies the points on the systolic upstroke that correspond to the two half maximum values on the corresponding first  
   # derivative peak. The first, before w, is denoted U. The second, after w, is denoted V. 
@@ -364,6 +365,7 @@ find_u_v <- function(wx, wy, d1, d1p, spline, plot = FALSE){
   # d1 (The first derivative time series, discrete form)
   # d1p (The first derivative time series, polynomial spline form)
   # spline (The original PPG time series, polynomial spline form)
+  # sr (samplingRate)
   # plot (Logical, will plot the first derivative time series with U and V values as points if set to true)
   
   # Outputs:
@@ -377,13 +379,13 @@ find_u_v <- function(wx, wy, d1, d1p, spline, plot = FALSE){
   halfHeightX <- c()                                                                          
   halfHeightY <- c()
   for(i in 1:length(wHalfHeight)){                                                            # For each 1st derivative peak, create a polynomial spline of the peak only
-    d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-5):(round(wx[i])+5),
-                 d1[(round(wx[i])-5):(round(wx[i])+5)], "natural")                            
+    d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-(sr/8)):(round(wx[i])+(sr/8)),
+                 d1[(round(wx[i])-(sr/8)):(round(wx[i])+(sr/8))], "natural")                            
     preHalfHeights <- solve(d1PeakSub, b = wHalfHeight[i])                                    # Identify the x-coordinates of the new spline when the y-value = the half maximum
     
     if(length(preHalfHeights) < 2){                                                           # If only one coordinate is found, extend the length of the spline, 
-      d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-10):(round(wx[i])+10),          # and search again
-                   d1[(round(wx[i])-10):(round(wx[i])+10)], "natural")                        
+      d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-(sr/4)):(round(wx[i])+(sr/4)),          # and search again
+                   d1[(round(wx[i])-(sr/4)):(round(wx[i])+(sr/4))], "natural")                        
       preHalfHeights <- solve(d1PeakSub, b = wHalfHeight[i]) 
     }
     
@@ -471,22 +473,39 @@ find_o <- function(wx, inx, iny, d1p, sp){
 
 
 preclean_wuv <- function(w, uv, o, samp, sp, q = FALSE){
+  ########################################################################################################################################
+  # PreClean takes u, v and w values and assesses the x-axis (time) difference between them for each beat. For normal beats, time from
+  # u to w is around half (50%) of the time from u to v. Beats with abnormal / artefactual systolic upstrokes tend to have outlying 
+  # values for this measure. Thus PreClean can identify and remove them. 
   
-  # Find where W lies from U to V on the x-axis, for each wave find the percentage distance to V: 
-  vDist <- c()
-  for(i in 1:length(w$wX)){
+  # Inputs: 
+  # w (vector of all x-axis coordinates corresponding to w points)
+  # uv (a dataframe containing x and y coordinates for all u and v values)
+  # o (vector of O points)
+  # samp (sample rate)
+  # sp (The original PPG time series, discrete form)
+  # q (Logical, will pause function and give the option of plotting rejected beats)
+  
+  # Outputs:
+  # w (as above, with aberrant beats removed)
+  # uv (              "       "             )
+  # o (               "       "             )
+  ########################################################################################################################################
+  
+  vDist <- c()                                                                                # For each wave, find the timing of w relative  
+  for(i in 1:length(w$wX)){                                                                   # to u and v, expressed as a percentage 
     vDist[i] <- (w$wX[i] - uv$uX[i]) / (uv$vX[i] - uv$uX[i])*100
   }
-  # plot(w$wX, vDist, type = "l")
+  # plot(w$wX, vDist, type = "l")                                                             # This value may be of interest in itself (see plot)
   
-  # Make a vector of abnormal pdtv (allowing any values between 30 and 70): 
-  sdpdtv <- sd(vDist)
-  pdtvWaves <- c(which(vDist > (sdpdtv + median(vDist)) & vDist > 70), which(vDist < (median(vDist) - sdpdtv) & vDist < 30))
+  sdpdtv <- sd(vDist)                                                                         # Make a vector of all beats where this value is abnormal, 
+  pdtvWaves <- c(which(vDist > (sdpdtv + median(vDist)) & vDist > 70),                        # either by being greater than one standard deviation 
+                 which(vDist < (median(vDist) - sdpdtv) & vDist < 30))                        # from the median, or having an absolute value < 30 or > 70
   
-  # Remove pdtvWaves:
   if(length(pdtvWaves) > 0){
-    cat("\n", length(pdtvWaves), "waves removed due to abnormal distances between u, v and w" )
-    if(q == TRUE){
+    cat("\n", length(pdtvWaves), 
+        "waves removed due to abnormal distances between u, v and w" )                        
+    if(q == TRUE){                                                                            # If q = T, enter debug / plot routine
       plotyyy <- 0
       while(plotyyy == 0){
         plotyy <- readline(prompt = "Would you like to view? (enter yes or no)")
@@ -499,7 +518,8 @@ preclean_wuv <- function(w, uv, o, samp, sp, q = FALSE){
               points(uv$uX, uv$uY)
               points(uv$vX, uv$vY)
             }else{
-              plot((w$wX[pdtvWaves[i]]-samp*5):(w$wX[pdtvWaves[i]]+samp*5), sp[(w$wX[pdtvWaves[i]]-samp*5):(w$wX[pdtvWaves[i]]+samp*5)], type = "l")
+              plot((w$wX[pdtvWaves[i]]-samp*5):(w$wX[pdtvWaves[i]]+samp*5), 
+                   sp[(w$wX[pdtvWaves[i]]-samp*5):(w$wX[pdtvWaves[i]]+samp*5)], type = "l")
               points(w$wX, w$wY)
               points(w$wX[pdtvWaves[i]], w$wY[pdtvWaves[i]], pch =19, col = 'red')
               points(uv$uX, uv$uY)
@@ -515,32 +535,44 @@ preclean_wuv <- function(w, uv, o, samp, sp, q = FALSE){
         if(plotyy != "yes" & plotyy != "no"){cat("\n", "please enter 'yes' or 'no'")}
       }
     }
-    w <- w[-pdtvWaves, ]
+    w <- w[-pdtvWaves, ]                                                                      # Remove beats with abnormal values from all relevant vectors
     uv <- uv[-pdtvWaves, ]
-    o <- o[-pdtvWaves]       # o vector also has to be corrected for the removed wave... 
+    o <- o[-pdtvWaves]       
   }
   return(list(w, uv, o))
 }
 
 
 baseline <- function(inx, iny, o, dat, sp, plot = FALSE){
-  # Making a (non-polynomial) spline to fit the baseline
-  sfunction2 <- splinefun(inx[o], iny[o], method = "natural")
-  splineBase <- sfunction2(seq(1, length(dat)), deriv = 0)
+  ########################################################################################################################################
+  # RemoveBaselineDrift generates a spline to fit the wandering baseline of the PPG time series and subtracts it from the time series. 
+  # Given baseline drift is indicative of vasomotion and respiratory modulation, it may be of interest to extract the spline.
   
-  # Plotting spline_base on spline_poly
-  if(plot){
+  # Inputs: 
+  # inx (A vector of all inflection point x-coordinates in the PPG time series)
+  # iny (A vector of all inflection point y-coordinates in the PPG time series)
+  # o (A vector of all O points)
+  # dat (The original PPG time series (preprocessed))
+  # sp (The original PPG time series, polynomial spline form)
+  # plot (Logical, plots baseline spline and the original PPG time series)
+  
+  # Outputs:
+  # baseCor (time series with baseline wander removed)
+  ########################################################################################################################################
+
+  sfunction2 <- splinefun(inx[o], iny[o], method = "natural")                                 # Create a spline from the O points through
+  splineBase <- sfunction2(seq(1, length(dat)), deriv = 0)                                    # the time series
+  
+  if(plot){                                                                                   # Plot the baseline spline and time series
     plot(sp)
     points(inx[o], iny[o], pch = 19)
     lines(splineBase)
   }
   
-  # Correcting for baseline:
-  baseCor <- dat - splineBase
-  if(plot){
-    plot(baseCor, type = "l")
-    # Plot new baseline (y = 0)
-    lines(1:length(dat), seq(from = 0, to = 0, length.out = length(dat)))
+  baseCor <- dat - splineBase                                                                 # Subtract the baseline spline from the time 
+  if(plot){                                                                                   # series, thereby removing baseline drift
+    plot(baseCor, type = "l")                                                                  
+    lines(1:length(dat), seq(from = 0, to = 0, length.out = length(dat)))                     # Plot new baseline (y = 0)     
   }
   
   return(baseCor)
@@ -549,26 +581,50 @@ baseline <- function(inx, iny, o, dat, sp, plot = FALSE){
 
 
 clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
+  ########################################################################################################################################
+  # CleanWuv first identifies erroneous beats and removes them, by identifying abnormal values of U and V, and the y-axis difference 
+  # between them. It then calculates O-O intervals and inter-beat intervals, and removes beats preceding large intervals. 
+
+  # Inputs: 
+  # wuv (a dataframe of all w, u and v values corresponding to detected and pre-cleaned beats in the time series)
+  # sp (the baseline-corrected PPG time series, polynomial spline form)
+  # inx (a vector of all inflection point x-coordinates in the PPG time series)
+  # o (a vector of all O points)
+  # samp (sampling rate)
+  # bc (the baseline-corrected PPG time series, discrete form)
+  # q (logical, will pause function and give the option of plotting rejected beats)
   
-  o2 <- o
+  # Outputs:
+  # d (a dataframe combining the following three structures):
+    # wuv (the inputted dataframe of w, u and v values, with rows corresponding to erroneous beats removed)
+    # diffVU (a vector of y-axis differences between u and v for each beat - for scaling purposes)
+    # o2 (a vector of O points, with those corresponding to erroneous beats removed)
+  # ibi (a vector of all inter-beat intervals (x-axis differences between sucessive W points))
+  # oDiff (a vector of all O-O intervals (x-axis differences between successive O points))
+  ########################################################################################################################################
   
-  # Remove u values that are implausibly far from baseline                             
-  falseU <- c()
-  for(i in 1:(nrow(wuv)-1)){
-    if(wuv$uY[i] > (median(wuv$uY) + 2*std(wuv$uY)) & wuv$uY[i] > 1 & wuv$uY[i] > wuv$uY[i+1]*2 | wuv$uY[i] < -50){
+  o2 <- o                                                                                     # Define a second vector for O from which 
+                                                                                              # rejected waves are to be removed
+  
+  falseU <- c()                                                                               # Identify U values that are implausibly far 
+  for(i in 1:(nrow(wuv)-1)){                                                                  # from baseline    
+    if(wuv$uY[i] > (median(wuv$uY) + 2*std(wuv$uY)) & wuv$uY[i] > 1 &                         
+       wuv$uY[i] > wuv$uY[i+1]*2 | wuv$uY[i] < -50){
       falseU[i] <- i
     }
   }
   if(length(falseU) > 0){
     falseU <- falseU[!is.na(falseU)]
-    cat("\n", length(falseU), "/", nrow(wuv), "waves removed due to U having an abnormally high y-value relative to baseline")
-    if(q == TRUE){
-      plotyyy <- 0
+    cat("\n", length(falseU), "/", nrow(wuv), 
+        "waves removed due to U having an abnormally high y-value relative to baseline")
+    if(q == TRUE){                                                                            # Optional debug mode for plotting waves  
+      plotyyy <- 0                                                                            # with erroneous U values
       while(plotyyy == 0){
         plotyy <- readline(prompt = "Would you like to view? (enter yes or no)")
         if(plotyy == "yes"){
           for(i in 1:length(falseU)){
-            plot((wuv$wX[falseU[i]]-samp*2):(wuv$wX[falseU[i]]+samp*2), bc[(wuv$wX[falseU[i]]-samp*2):(wuv$wX[falseU[i]]+samp*2)], type = "l")
+            plot((wuv$wX[falseU[i]]-samp*2):(wuv$wX[falseU[i]]+samp*2), 
+                 bc[(wuv$wX[falseU[i]]-samp*2):(wuv$wX[falseU[i]]+samp*2)], type = "l")
             points(wuv$uX[falseU[i]], wuv$uY[falseU[i]], pch = 19)
             points(wuv$uX[falseU[i]-1], wuv$uY[falseU[i]-1])
             points(wuv$uX[falseU[i]+1], wuv$uY[falseU[i]+1])
@@ -583,34 +639,32 @@ clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
       }
     }
     if(length(falseU) > 0){
-      o2 <- o2[-falseU]    # line 519
+      o2 <- o2[-falseU]                                                                       # Remove erroneous U values
       wuv <- wuv[-falseU, ]
     }
   }
   
-  # Find v-u differences (on y-axis):
-  diffVU <- wuv$vY - wuv$uY
-  
-  # undetected artefacts can lead to repeats in half heights (if the deriv peak is too wide), which will lead to 
-  # scale factors of 0, check for these:
-  if(length(which(diffVU == 0)) > 0){
-    dup <- which(diffVU == 0)
+  diffVU <- wuv$vY - wuv$uY                                                                   # Find y-axis v-u difference (scale factor) for each wave 
+  if(length(which(diffVU == 0)) > 0){                                                         # Remove waves where the above difference is 
+    dup <- which(diffVU == 0)                                                                 # 0 (indicating an artefact)
     wuv <- wuv[-dup, ]
     diffVU <- diffVU[-dup]
-    cat(length(which(diffVU == 0)), "/", nrow(wuv), "waves removed due to scale factors of 0 (u and v incorrectly identified)")
+    cat(length(which(diffVU == 0)), "/", nrow(wuv), 
+        "waves removed due to scale factors of 0 (u and v incorrectly identified)")
   }
   
-  # Make a vector of waves with abnormally small scale factors and remove them:
-  falseScale <- which(diffVU < (median(diffVU) - 5*(std(diffVU))))   # changed 4* to 5*
-  if(length(falseScale) > 0){
-    cat("/n", length(falseScale), "/", nrow(wuv), "waves removed due to scale factors of 0 (u and v incorrectly identified)")
+  falseScale <- which(diffVU < (median(diffVU) - 5*(std(diffVU))))                            # Identify beats where the v-u difference is abnormally small  
+  if(length(falseScale) > 0){                                                                 # and remove them (with optional debug mode as above)
+    cat("/n", length(falseScale), "/", nrow(wuv), 
+        "waves removed due to scale factors of 0 (u and v incorrectly identified)")
     if(q == TRUE){
       plotyyy <- 0
       while(plotyyy == 0){
         plotyy <- readline(prompt = "Would you like to view? (enter yes or no)")
         if(plotyy == "yes"){
           for(i in 1:length(falseScale)){
-            plot((wuv$wX[falseScale[i]]-samp*2):(wuv$wX[falseScale[i]]+samp*2), bc[(wuv$wX[falseScale[i]]-samp*2):(wuv$wX[falseScale[i]]+samp*2)], type = "l")
+            plot((wuv$wX[falseScale[i]]-samp*2):(wuv$wX[falseScale[i]]+samp*2), 
+               bc[(wuv$wX[falseScale[i]]-samp*2):(wuv$wX[falseScale[i]]+samp*2)], type = "l")
             points(wuv$uX[falseScale[i]], wuv$uY[falseScale[i]])
             points(wuv$vX[falseScale[i]], wuv$vY[falseScale[i]])
           }
@@ -630,51 +684,41 @@ clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
     }
   }
   
-  
-  ## Find o points again:
-  oY <- predict(sp, inx[o])
-  # plot(splinePolyBC)
-  # points(inflexX[o], oY, pch = 19)
-  
-  # Find o-w difference:
-  owDiff <- c()
+  oY <- predict(sp, inx[o])                                                                   # Identify O y-values on the original PPG trace
+  owDiff <- c()                                                                               # Find the x-axis difference between O and W
   for(i in 1:length(wuv$wX)){
     owDiff[i] <- wuv$wX[i] - inx[o[i]]
   }
   
-  # Find distance between o_points:
-  oDiff <- c()
+  oDiff <- c()                                                                                # Find the x-axis difference between successive o_points
   for(i in 1:(length(inx[o])-1)){
     oDiff[i] <- inx[o[i+1]] - inx[o[i]]
   }
   
-  # Find distance between W points (Inter-beat interval):
-  ibi <- c()
-  for(i in 1:(length(wuv$wX))-1){
+  ibi <- c()                                                                                  # Find the x-axis difference between successive W points,  
+  for(i in 1:(length(wuv$wX))-1){                                                             # and designate as inter-beat intervals
     ibi[i] <- wuv$wX[i+1] - wuv$wX[i]
   }
   
-  # Remove last W:
-  o2 <- o2[-length(o2)]
+  o2 <- o2[-length(o2)]                                                                       # Remove the last W (in case final beat is incomplete)
   wuv <- wuv[-nrow(wuv), ]
   diffVU <- diffVU[-length(diffVU)]  
+                                                                                                      
+  # plot(ibi)                                                                                 # Identify abnormal inter-beat intervals indicative of 
+  # points(which(ibi > 1.25*median(ibi)),                                                     # an extended time between beats (e.g due to artefact)
+  # ibi[which(ibi > 1.25*median(ibi))], pch = 19, col = "red")                                # These can be plotted (see left)
   
-  # Make a vector of abnormal IBIs (the waves at the end of a sequence / before an artefact): 
-  # plot(ibi)
-  # points(which(ibi > 1.25*median(ibi)), ibi[which(ibi > 1.25*median(ibi))], pch = 19, col = "red")
-  endWaves <- c()
-  for(i in 2:(length(ibi)-1)){
-    # ibi should be greater than the median ibi by a factor of 1.25, and greater than at least one of the values either side of it to be included:
-    if(ibi[i] > 1.3*median(ibi) & ( ibi[i] > 2*ibi[i-1] | ibi[i] > 2*ibi[i+1] ) ){  
-      endWaves[i] <- i 
-    }
-  }
-  
-  
-  # Remove end_waves from all vectors:
-  if(length(endWaves) > 0){
+  endWaves <- c()                                                                             # Abnormal inter-beat intervals are defined as greater 
+  for(i in 2:(length(ibi)-1)){                                                                # than the median interval by a factor of 1.3, and
+    if(ibi[i] > 1.3*median(ibi) & ( ibi[i] > 2*ibi[i-1] | ibi[i] > 2*ibi[i+1])){              # greater than at least one of the values adjacent
+      endWaves[i] <- i                                                                        # to it by a factor of 2
+    }                                                                                         
+  }                                                                                           # Beats preceding abnormal intervals are removed as they
+  if(length(endWaves) > 0){                                                                   # will not have an O point to mark their end
     endWaves <- endWaves[!is.na(endWaves)]
-    cat("\n", length(endWaves), "/", nrow(wuv), "waves removed due to the end of the wave (next o point) not being corrected for baseline")
+    cat("\n", length(endWaves), "/", nrow(wuv), 
+        "waves removed due to the end of the wave (next o point) 
+         not being corrected for baseline")
     if(q == TRUE){
       plotyyy <- 0
       while(plotyyy == 0){
@@ -685,7 +729,8 @@ clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
               plot(1:(samp*10), bc[1:(samp*10)], type = "l")
               points(wuv$wX[endWaves[i]], wuv$wY[endWaves[i]], pch =19, col = 'red')
             }else{
-              plot((wuv$wX[endWaves[i]]-samp*5):(wuv$wX[endWaves[i]]+samp*5), bc[(wuv$wX[endWaves[i]]-samp*5):(wuv$wX[endWaves[i]]+samp*5)], type = "l")
+              plot((wuv$wX[endWaves[i]]-samp*5):(wuv$wX[endWaves[i]]+samp*5), 
+                   bc[(wuv$wX[endWaves[i]]-samp*5):(wuv$wX[endWaves[i]]+samp*5)], type = "l")
               points(wuv$wX[endWaves[i]], wuv$wY[endWaves[i]], pch =19, col = 'red')
               points(wuv$wX[endWaves[i]+1], wuv$wY[endWaves[i]+1], pch = 19, col = 'red')
               points(wuv$wX, wuv$wY)
@@ -706,8 +751,8 @@ clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
       diffVU <- diffVU[-endWaves] 
     }
   }
-  d <- cbind(wuv, diffVU, o2)
-  dat <- list(d, ibi, oDiff)
+  d <- cbind(wuv, diffVU, o2)                                                                 # Bind vectors with element number corresponding to beat number 
+  dat <- list(d, ibi, oDiff)                                                                  # into a single dataframe before outputting 
   return(dat)
 }
 
@@ -740,21 +785,22 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
       Sys.sleep(10)
       meds_roi <- (round(length(ibi)/2) - 10) : (round(length(ibi)/2) + 10)
     }
-    pre_indx <- which(abs(ibi[1:indx] - post) < 0.5) # finds the values that are closest to the half point
+    pre_indx <- which(abs(ibi[1:indx] - post) < 0.5) + 0 # finds the values that are closest to the half point  # To ensure pre_indx is not < 75, have change ibi[1:indx] to ibi[75:indx], and 0 to 74...
     # If no values within 0.5 of the half-way point, extend the range to 1.5 and so on:
     a <- 0.5
     while(length(pre_indx) < 1){
       a <- a + 1
-      pre_indx <- which(abs(ibi[1:indx] - post) < a)
+      pre_indx <- which(abs(ibi[1:indx] - post) < a) + 0 # Have to adjust for the fact that 1 = 75 now
     }
     in2 <- which(abs(pre_indx - indx) == min(abs(pre_indx - indx))) # take the one closest to the minimum
     pre_indx <- pre_indx[in2]
+    
     # Find the closest to the half point from the points after the minimum
-    post_indx <- indx + which(abs(ibi[indx:length(ibi)] - post) < 0.5)
+    post_indx <- indx + which(abs(ibi[indx:length(ibi)] - post) < 0.5)   # changed length(ibi) to 210
     a <- 0.5
     while(length(post_indx) < 1){
       a <- a + 0.25
-      post_indx <- indx + which(abs(ibi[indx:length(ibi)] - post) < a)
+      post_indx <- indx + which(abs(ibi[indx:length(ibi)] - post) < a)  # changed length(ibi) to 210
     }
     while(post_indx[1] < indx + 15){
       post_indx <- post_indx[-1]
@@ -771,16 +817,15 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
       ppg_post <- which((ppg[,1]) == beat[nrow(beat),1])
     }
     
-    plot(ibi, main = paste(c("2mg, ", ppg[ppg_pre, 1], "seconds", "to", ppg[ppg_post, 1], "seconds"), collapse = " "))
-    points(pre_indx:post_indx, ibi[pre_indx:post_indx], col='red')
-    
     # You might have to re-derive pre and post indx from ppg pre and post
     subs <- which(wuv$wX > ppg_pre & wuv$wX < ppg_post)
     cat(length(subs), "beats in subset (pre-cleaning)")
-    Sys.sleep(2)
+    #Sys.sleep(2)
     
     # Subset:
     wuv <- wuv[subs, ]
+    # Subset ibi:
+    ibi <- ibi[subs]
   }
   
   if(subset == "rep"){
@@ -797,13 +842,10 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
       subs <- subs[1:boundaries[2]]
     }
     
-    # Plot
-    plot(ibi, main = paste(c("0mg, ", boundaries[2], "beats from", ppg[boundaries[1], 1], "seconds"), collapse = " "))
-    points(subs, ibi[subs], col = "red")
-    Sys.sleep(2)
-    
     # Subset:
     wuv <- wuv[subs, ]
+    # Subset:
+    ibi <- ibi[subs]
   }
   
   
@@ -964,6 +1006,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
       }
       wuv <- wuv[-(extra_long_wave[!is.na(extra_long_wave)]-1), ]
       pulse <- pulse[, -(extra_long_wave[!is.na(extra_long_wave)])]  
+      ibi <- ibi[-(extra_long_wave[!is.na(extra_long_wave)]-1)]
     }
   
 
@@ -998,6 +1041,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(extra_short_waves-1), ]
     pulse <- pulse[, -(extra_short_waves)]  
+    ibi <- ibi[-(extra_short_waves-1)]
   }
 
   
@@ -1047,47 +1091,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(double_segments-1), ]
     pulse <- pulse[, -(double_segments)]  
-  }
-  
-  
-  # Remove tall waves:
-  nodontdothis <- 1
-  if(nodontdothis != 1){
-    tall_waves <- c()
-    for(i in 2:ncol(pulse)){
-      if(max(abs(pulse[, i][!is.na(pulse[, i])])) > 1.75){   
-        tall_waves[i] <- i
-      }
-    }
-    if(length(tall_waves) > 0){
-      tall_waves <- tall_waves[!is.na(tall_waves)]
-      cat("\n", length(tall_waves), "/", (ncol(pulse)-1), "waves removed for being abnormally high amplitude")
-      if(q == TRUE){
-        plotyyy <- 0
-        while(plotyyy == 0){
-          plotyy <- readline(prompt = "Would you like to view? (enter yes or no)")
-          if(plotyy == "yes"){
-            for(i in 1:length(tall_waves)){
-              plot((wuv$wX[tall_waves[i]-1]-samp*4):(wuv$wX[tall_waves[i]-1]+samp*4), bc[(wuv$wX[tall_waves[i]-1]-samp*4):(wuv$wX[tall_waves[i]-1]+samp*4)], type = "l")
-              lines(1:100000, rep(0, 100000))
-              points(wuv$wX[tall_waves[i]-1], wuv$wY[tall_waves[i]-1], pch = 19, col = "red")
-              points(wuv$wX, wuv$wY)
-              points(wuv$uX, wuv$uY)
-              points(wuv$vX, wuv$vY)
-              plot(pulse[, tall_waves[i]])
-            }
-            plotyyy <- 1
-          }
-          if(plotyy == "no"){
-            cat("\n", "ok") 
-            plotyyy <- 1
-          }
-          if(plotyy != "yes" & plotyy != "no"){cat("\n", "please enter 'yes' or 'no'")}
-        }
-      }
-      wuv <- wuv[-c(tall_waves-1), ]
-      pulse <- pulse[, -c(tall_waves)]
-    }
+    ibi <- ibi[-(double_segments-1)]
   }
   
 
@@ -1122,6 +1126,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(systolic_endings-1), ]
     pulse <- pulse[, -systolic_endings]
+    ibi <- ibi[-(systolic_endings-1)]
   }
   
   # Find average wave:
@@ -1132,7 +1137,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
   for(i in 2:ncol(pulse)){
     wave <- pulse[, i][!is.na(pulse[, i])]
     thd <- 4   # threshold subject to change (default 2)
-    if((min(wave) < wave[1]*thd | min(wave) < min(average_wave[!is.na(average_wave)])*thd) & min(wave) < 0){  
+    if((min(wave) < wave[1]*thd | min(wave) < -0.3 | min(wave) < min(average_wave[!is.na(average_wave)])*thd) & min(wave) < 0){  
       drops_below_o[i] <- i
     }
   }
@@ -1158,6 +1163,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(drops_below_o-1), ]        # Remember, the pulse has the 1st column, meaning pulse[, drops_below_o] = wuv[drops_below_o - 1, ] (hence the -1 here) 
     pulse <- pulse[, -drops_below_o]    
+    ibi <- ibi[-(drops_below_o-1)]
   }
   
   
@@ -1171,12 +1177,13 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
   resid_sd <- c()
   for(i in 2:ncol(pulse)){
     residuals <- average_wave[142:length(average_wave)] - pulse[, i][142:length(pulse[, i])]
-    resid_sd[i] <- sd(residuals[!is.na(residuals)])
+    resid_sd[i] <- sd(residuals[!is.na(residuals)][-c(1:100)])  # removed 1:100 since at this point all values are close to the average on the systolic upstroke
   }
-  resid_sd <- sqrt(resid_sd)
+  resid_sd <- sqrt(resid_sd)  # equivalent of squaring, since the resifual values are fractions when scaled
   resid_sd <- resid_sd[-1] # remove the NA
-  thld <- mean(resid_sd) + sd(resid_sd)*4   # threshold could be adjusted (has been increased from 2)
-  hrsd_waves <- which(resid_sd > thld) + 1  
+  # thld <- mean(resid_sd) - sd(resid_sd)*0.5   # threshold could be adjusted (has been increased from 2)
+  thld <-  0.35  
+  hrsd_waves <- which(resid_sd > thld) + 1  # +1 to account for the removed NA value
   if(length(hrsd_waves) > 0){
     cat("\n", length(hrsd_waves), "/", (ncol(pulse)-1), "waves removed for having high residual SD")
     if(q == TRUE){
@@ -1198,6 +1205,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(hrsd_waves-1), ]
     pulse <- pulse[, -hrsd_waves]
+    ibi <- ibi[-(hrsd_waves-1)]
   }
   
   
@@ -1207,8 +1215,8 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     breaches <- c()
     wave <- pulse[, i]
     for(j in 142:length(wave)){   # look only after w
-      if(is.na(pulse[j, i]) == FALSE & is.na(average_wave[j] + 5*sd_wave[j]) == FALSE){
-        if(pulse[j, i] > (average_wave[j] + 5*sd_wave[j]) | pulse[j, i] < (average_wave[j] - 5*sd_wave[j])){
+      if(is.na(pulse[j, i]) == FALSE & is.na(average_wave[j] + 4*sd_wave[j]) == FALSE){
+        if(pulse[j, i] > (average_wave[j] + 4*sd_wave[j]) | pulse[j, i] < (average_wave[j] - 4*sd_wave[j])){
           breaches[j] <- 1
         }
       }
@@ -1239,6 +1247,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
     wuv <- wuv[-(outlier_waves-1), ]
     pulse <- pulse[, -outlier_waves]
+    ibi <- ibi[-(outlier_waves-1)]
   }
   
   # Final recalculation of average wave:
@@ -1251,7 +1260,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
   rejects <- list(extra_long_wave, extra_short_waves, double_segments, systolic_endings, drops_below_o, hrsd_waves, outlier_waves)
   
   dat <- list(average_wave, pulse, wuv, rejects)
-  if(subset == T){dat <- list(average_wave, pulse, wuv, rejects, c(ppg_pre, nrow(wuv)))}
+  if(subset == T){dat <- list(average_wave, pulse, wuv, rejects, c(ppg_pre, nrow(wuv)), ibi)}
   
   return(dat)
 }
@@ -1447,6 +1456,10 @@ diast_pk <- function(avw, sr, scale = F, dias_param = NULL){
     }
     dias_param <- dias_param + avInflexX[peaks_above_0[1]]
     diastPk <-  avInflexX[peaks_above_0[which( abs(avInflexX[peaks_above_0] - dias_param) == min(abs(avInflexX[peaks_above_0] - dias_param)))]] 
+    # If the value assigned is just the max of the wave (i.e systolic peak, default to sr*500):
+    if(avInflexY[peaks_above_0[which( abs(avInflexX[peaks_above_0] - dias_param) == min(abs(avInflexX[peaks_above_0] - dias_param)))]] - max(avw) < 2){
+      diastPk <- 5*sr
+    }
     peaks <- peaks_above_0
     fitted <- 1
   }else{
@@ -1576,7 +1589,12 @@ osnd_of_average <- function(aw, dp, diff, sr, plot = TRUE){
           notchRange <- notchRange[which(notchRange > notchRange[a.])] 
         }
       }
-      new.n <- d1InflxX[notchRange[a.]]
+      if(is.na(d1InflxX[notchRange[a.]])){  # Added this due to bug with participant 7
+        a. <- which(d1InflxY[notchRange] == max(d1InflxY[notchRange]))
+        new.n <- d1InflxX[notchRange[a.]-1]
+      }else{
+        new.n <- d1InflxX[notchRange[a.]]
+      }
     }else{
       new.n <- d1InflxX[notchRange[1]]
     }
@@ -1640,9 +1658,10 @@ osnd_of_average <- function(aw, dp, diff, sr, plot = TRUE){
   halfHeights <- solve(d1WavPoly, b = hhaw)
   #halfHeightsY <- predict(d1WavPoly, halfHeights)
   
-  # If only one half height detected, assume the segment had quite a high O value such that O was higher than V:
+  # If only one half height detected, assume the segment had quite a high O value such that O was higher than U:
   if(length(halfHeights) < 2){
-    halfHeights[2] <- solve(d1WavPoly, b = d1Wav[1])[1]
+    halfHeights[2] <- halfHeights[1]
+    halfHeights[1] <- solve(d1WavPoly, b = d1Wav[1])[1]
   }
   
   # If more than one half height detected:
@@ -1697,9 +1716,14 @@ osnd_of_average <- function(aw, dp, diff, sr, plot = TRUE){
   
   ## Find S:
   # Find new S:
-  s2 <- w. + 2*(abs(v - w.))
-  s2Y <- predict(avWavPoly, s2)
-  #points(s2, s2Y)
+  if( (v - w.) > 100 ){    # if v is erroneous, then this part will not generate a viable alternative to s1
+    s2Y <- max(wavInflxY)
+    s2 <- wavInflxX[which(wavInflxY == max(wavInflxY))]
+  }else{
+    s2 <- w. + 2*(abs(v - w.))
+    s2Y <- predict(avWavPoly, s2)
+  }        
+  # points(s2, s2Y)
   # Define old s:
   s1Y <- max(wavInflxY)
   s1 <- wavInflxX[which(wavInflxY == max(wavInflxY))]
