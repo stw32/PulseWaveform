@@ -14,7 +14,7 @@
 # Set starting parameters (samplingRate etc) as required
 # pk_thrshd must be set appropriately for the script to run. If using new data, run the script up to line 78, run plot(vpg, t = "l"), and select an appropriate objective threshold above which all inflection points are peaks 
 
-setwd("Desktop/Scripts")    
+setwd("Desktop/Scripts")                 # (alter file path as required)     
 
 library(tidyverse)                                 
 library(splines2)
@@ -25,8 +25,8 @@ library(DescTools)
 library(zoo)
 library(readr)
 
-source("~/Desktop/Scripts/PPG_funcs.R")
-source("~/Desktop/Scripts/iso_funcs.R")
+source("~/Desktop/Scripts/PPG_funcs.R")  # (alter file path as required)              
+source("~/Desktop/Scripts/iso_funcs.R")  # (alter file path as required)   
 
 
 
@@ -51,7 +51,7 @@ AllOutputs <- list()                # For storing all outputs
 ###################################################################################
 
 
-data <- read.csv("~/Desktop/PulseAnalysis/Data/Craig/source.csv", header = T)                     # Read in time series data 
+data <- read.csv("~/Desktop/PulseAnalysis/Data/Craig/source.csv", header = T)                     # Read in time series data (alter file path as required)   
 
 
 
@@ -257,8 +257,7 @@ if(run_hed == TRUE){
     
     PlotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2)                   # Plots modelled waves (including component waves) with basic R plot function
     
-    # This may need some work to get working properly:
-    
+   
     # GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2,               # Plots modelled waves in GGplot form (see main text figures) 
     # run = 1, pr = 1, p = T)
     
