@@ -8,13 +8,10 @@
   # 3. Setting script parameters: These can be adjusted as required to fit new data; sampling rate and pk_threshld are likely to need changing with new hardware sources.
 
 # Prelims:
-# Download and save scripts from the PulseWaveform repository to a single folder
-# Set working directory to that folder
-# Ensure the below packages (tidyverse etc) are installed
+# Insall PulseWaveform package from  github repository: devtools::install_github(repo = 'stw32/PulseWaveform')
+# Ensure the below packages (tidyverse etc) are installed also
 # Set starting parameters (samplingRate etc) as required
 # pk_thrshd must be set appropriately for the script to run. If using new data, run the script up to line 78, run plot(vpg, t = "l"), and select an appropriate objective threshold above which all inflection points are peaks
-
-setwd("Desktop/Scripts")                 # (alter file path as required)
 
 library(tidyverse)
 library(splines2)
