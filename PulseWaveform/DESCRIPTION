@@ -1,0 +1,16 @@
+Package: PulseWaveform
+Title: Extraction of Photoplethysmography Waveform Features and Decomposition Modeling of Pulse Waveforms
+Version: 0.1.0
+Authors@R: c(person("Simon", "Williamson", role = c("aut", "cre"),
+                     email = "si.williamson.122@googlemail.com"),
+              person("Lucie", "Daniel-Watanabe", role = "aut"),
+              person("Johanna", "Finnemann", role = "aut"),
+              person("Craig", "Powell", role = "aut"))
+Description: PulseWaveform provides functions useful for the processing of 
+    Photoplethymography (PPG) data in R, including pre-processing, beat segmentation,
+    amplitude scaling, fiducial point detection, morphological feature extraction, 
+    and decomposition modeling using a Nelder-Mead downhill simplex optimisation method. 
+License: use_mit_license()
+Encoding: UTF-8
+URL: https://github.com/stw32/PulseWaveform
+
