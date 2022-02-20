@@ -27,8 +27,9 @@ The PulseWaveform package and associated pipelines make use of the following pac
 - library(PulseWaveform)
 
 # Analysis Pipeline:
+The general analysis pipeline's structure is illustrated below. Pulse decomposition modelling (and subsequent outputs) are optional and can be bypassed if only descriptive morphological features are desired. 
 
-<img width="796" alt="Screenshot 2022-02-20 at 16 25 03" src="https://user-images.githubusercontent.com/63592847/154852836-dcb2207b-a335-4814-9c8f-e1bb824257e0.png">
+<img width="909" alt="Screenshot 2022-02-20 at 16 28 36" src="https://user-images.githubusercontent.com/63592847/154853033-c604131b-e1b1-47b9-bde7-d6398217d298.png">
 
 ## Starting Parameters:
 Once all relevant packages are installed, starting parameters must be specified before running the general purpose script. These include: 
