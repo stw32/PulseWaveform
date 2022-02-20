@@ -5,17 +5,24 @@ An automated pipeline for the extraction of PPG waveform features, including the
 ```{r setup, include=FALSE}
 ```
 
-## PPG Model 2
+## Description
 
-This is a ReadMe for the photopletysmography (PPG) analysis published in []. It is supposed to both provide an overview of the workings of the code, any issues we encountered and some further explanations that did not make it into the paper. The basic assumption is that the signal is decaying towards a baseline and that the three relevant peaks can be modelled more consistently by discounting the decay element first. 
+This is a ReadMe for the PulseWaveform package and complementary analysis scripts as published in []. PulseWaveform contains a collection of functions for the processing and analysis of photoplethysmography (PPG) data. The General purpose script, located within the 'Scripts' folder in this repository, provides a foundational pipeline structure for implementing the package's functions to generate both morphological and HED model outputs that characterise the PPG pulse waveform. What follows is an expanded overview of the general analysis pipeline, in greater depth than was possible in the paper. Further details on assumptions made in constraining model behaviour are also included. 
+
+What is the Pulse Waveform? The fundamental signal inherent to the PPG, reflecting the peripheral changes in blood volume and pressure corresponding to each heart beat. Waveforms vary in their shape depending on a number of psychological and physiological factors; a detailed characterisation of these changes in morphology is the primary purpose of this repository. 
+
+What is the HED Model? The Hybrid Excess and Decay Model is an attempt to parameterize the waveform such that it may bestow more useful information than simple descriptive measures of waveform morphology alone. It assumes each waveform is composed of component waves that suprimpose to produce the overall morphology (excess element), and that each component wave also has an exponential decay (decay element). 
 
 # Prerequisites
-The script makes use of the following packages:  
+The PulseWaveform package and associated pipelines make use of the following packages:  
+- library(tidyverse)
 - library(splines2)  
 - library(pracma)  
 - library(SplinesUtils)    
 - library(spectral)
 - library(zoo)
+- library(readr)
+- library(PulseWaveform)
 
 # ISOFitting
 This is the main script from which the other functions are called. First the working directory needs to be changed so the other functions can be called and the sampling rate need to be adjusted, i.e. `samplingRate <- 40`. The `beats_in` and `batch_number` parameters determine how many beats the parameters are estimated over and how many batches are generated for analysis and optimisation. The code uses a chi-square goodness of fit test to improve model fit and will do so by minimising chi-square over all the beats within a batch. The default values are 10 for both.
