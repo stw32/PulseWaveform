@@ -14,6 +14,8 @@ What is the Pulse Waveform? The fundamental signal inherent to the PPG, reflecti
 What is the HED Model? The Hybrid Excess and Decay Model is an attempt to parameterize the waveform such that it may bestow more useful information than simple descriptive measures of waveform morphology alone. It assumes each waveform is composed of component waves that suprimpose to produce the overall morphology (excess element), and that each component wave also has an exponential decay (decay element). 
 
 # Prerequisites
+Install PulseWaveform: devtools::install_github(repo = 'stw32/PulseWaveform')
+
 The PulseWaveform package and associated pipelines make use of the following packages:  
 - library(tidyverse)
 - library(splines2)  
@@ -24,10 +26,27 @@ The PulseWaveform package and associated pipelines make use of the following pac
 - library(readr)
 - library(PulseWaveform)
 
-# ISOFitting
-This is the main script from which the other functions are called. First the working directory needs to be changed so the other functions can be called and the sampling rate need to be adjusted, i.e. `samplingRate <- 40`. The `beats_in` and `batch_number` parameters determine how many beats the parameters are estimated over and how many batches are generated for analysis and optimisation. The code uses a chi-square goodness of fit test to improve model fit and will do so by minimising chi-square over all the beats within a batch. The default values are 10 for both.
-If you would like to select a specific subsection of your dataset rather than analyse all beats change the parameter `all_beats <- TRUE` to `FALSE`.
-Then the path of the to-be-read-in files needs to specified. 
+## Analysis Pipeline:
+
+<img width="796" alt="Screenshot 2022-02-20 at 16 25 03" src="https://user-images.githubusercontent.com/63592847/154852836-dcb2207b-a335-4814-9c8f-e1bb824257e0.png">
+
+# Starting Parameters:
+Once all relevant packages are installed, starting parameters must be specified before running the general purpose script. These include: 
+
+1. Information about the PPG time series data to be inputted:
+  - Sample rate
+  - Peak finding threshold (follow instructions within GeneralPurposeScript to set this correctly)
+  
+2. Preferences for pulse decomposition modelling:
+  - To run the HED model or not
+  - The degree of model accuracy desired (number of simplex iterations)
+  - To model each waveform individually, or to fix certain parameters across waveforms (by specifying batch numbers of >1)
+  - To model only a subsection of the time series, or the entire time series (`all_beats <- FALSE` or `TRUE`)
+
+# Read in Data:
+Specify the file path of the PPG time series data to be analysed.
+
+# Preprocessing:
 
 
 In the first instance we are trying to estimate the various detrending algorithms that are often applied to the raw data by the hardware: As a first step in the preprocessing pipeline the factor value is adjusted to reverse-engineer an assumed positive gradient at the tail-end of each beat. The values are changed until they reach a plausible-looking threshold for each individual beat: 
