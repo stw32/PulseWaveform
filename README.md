@@ -9,7 +9,7 @@ An automated pipeline for the extraction of PPG waveform features, including the
 
 This is a ReadMe for the PulseWaveform package and complementary analysis scripts as published in []. PulseWaveform contains a collection of functions for the processing and analysis of photoplethysmography (PPG) data. The General purpose script, located within the 'Scripts' folder in this repository, provides a foundational pipeline structure for implementing the package's functions to generate both morphological and HED model outputs that characterise the PPG pulse waveform. What follows is an expanded overview of the general analysis pipeline, in greater depth than was possible in the paper. Further details on assumptions made in constraining model behaviour are also included. Further clarification on code specifics can be found by examining the PulseWaveform.R file, which includes all functions with detailed comments. For any further queries beyond this, contact stw32@cam.ac.uk. 
 
-What is the Pulse Waveform? The fundamental signal inherent to the PPG, reflecting the peripheral changes in blood volume and pressure corresponding to each heart beat. Waveforms vary in their shape depending on a number of psychological and physiological factors; a detailed characterisation of these changes in morphology is the primary purpose of this repository. 
+What is the Pulse Waveform? The fundamental signal inherent to PPG, reflecting the peripheral changes in blood volume and pressure corresponding to each heart beat. Waveforms vary in their shape depending on a number of psychological and physiological factors; a detailed characterisation of these changes in morphology is the primary purpose of this repository. 
 
 What is the HED Model? The Hybrid Excess and Decay Model is an attempt to parameterize the waveform such that it may bestow more useful information than simple descriptive measures of waveform morphology alone. It assumes each waveform is composed of component waves that suprimpose to produce the overall morphology (excess element), and that each component wave also has an exponential decay (decay element). 
 
@@ -50,7 +50,7 @@ Specify the file path of the PPG time series data to be analysed.
 ## Preprocessing:
 Two different preprocessing routines are possible with PulseWaveform:
   - Bioradio preprocessing: downsampling, correction of detrending, and removal of baseline wander (`preproc`)
-  - GE MR750 MRI scanner (ISO study) preprocessing: adjustment of successive decays in amplitude between datapoints, correction of entire time series gradient, and removal of baseline wander (`FindUndetrendingParams` and `UnDetrend`)
+  - GE MR750 MRI scanner (ISO study) preprocessing: adjustment of successive decays in amplitude between datapoints, correction of entire time series gradient, and removal of baseline wander* (`FindUndetrendingParams` and `UnDetrend`)
   
 An example of an individual waveform from the ISO dataset, before and after preprocessing, is given below. New time series data from other hardware sources will require unique preprocessing solutions, though the above routines may be useful as starting points. 
 
