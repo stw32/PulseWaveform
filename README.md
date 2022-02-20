@@ -48,16 +48,19 @@ Once all relevant packages are installed, starting parameters must be specified 
 Specify the file path of the PPG time series data to be analysed.
 
 ## Preprocessing:
+Two different preprocessing routines are possible with PulseWaveform:
+  - Bioradio preprocessing: downsampling, correction of detrending, and removal of baseline wander (`preproc`)
+  - GE MR750 MRI scanner (ISO study) preprocessing: adjustment of successive decays in amplitude between datapoints, correction of entire time series gradient, and removal of baseline wander (`FindUndetrendingParams` and `UnDetrend`)
+  
+An example of an individual waveform from the ISO dataset, before and after preprocessing, is given below. New time series data from other hardware sources will require unique preprocessing solutions, though the above routines may be useful as starting points. 
 
+<img width="889" alt="Screenshot 2022-02-20 at 16 56 23" src="https://user-images.githubusercontent.com/63592847/154854317-8460e4f9-6c16-4b0b-96c3-0f47c14a582c.png">
 
-In the first instance we are trying to estimate the various detrending algorithms that are often applied to the raw data by the hardware: As a first step in the preprocessing pipeline the factor value is adjusted to reverse-engineer an assumed positive gradient at the tail-end of each beat. The values are changed until they reach a plausible-looking threshold for each individual beat: 
-![](factorvalue.png)
+*baseline wander, whilst considered preprocessing, actually occurs later in the general purpose script, once trough points are known, using `baseline`. The below figure illustrates removal of baseline wander:
 
+<img width="940" alt="Screenshot 2022-02-20 at 17 20 49" src="https://user-images.githubusercontent.com/63592847/154855404-d6c94a1a-ef02-478c-975e-dab8bc0da43d.png">
 
-The next step involves calculating and applying an offset such that the main trendline of the data is approximately horizontal:
-![](offset1.png)
-Then the main fun starts!
-
+## Beat Segmentation
 We interpolate a cubic spline of the provided data points 
 `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
 and take its first derivative
