@@ -110,6 +110,42 @@ The cutoff thresholds for the above criteria were determined empirically and may
   
 ## Pulse Decomposition Modelling: The HED Model
 
+  - Theoretical Foundations and Model Components:A single prevailing physiological view on the nature of arterial waves and reflections has not yet been reached, largely due to the inherent complexity of the arterial tree. Nonetheless it is generally accepted that backward travelling reflectance waves exist and are likely to be measurable as composites from multiple reflection sites, irrespective of origin. Hitherto, three component waves of the pulse waveform have been described:
+    - (i) A systolic wave caused by the increase in pressure arising from left ventricular contraction and ejection of stroke volume. 
+    - (ii) A first reflectance wave, also described as the ‘renal’ wave’.
+    - (iii) A second reflectance wave, often referred to as the ‘diastolic’ wave.
+    
+PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
+    - (i) systolic; 
+    - (ii) first reflectance; 
+    - (iii) second reflectance waves. 
+Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. 
+    
+  The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies,86 was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters were incorporated:
+    - (i) Decay rate: The rate at which the signal decays exponentially to baseline in the absence of component wave influence.      - (ii) Baseline 1: The baseline towards which the signal decays during the systolic portion of the waveform. 
+    - (iii) Baseline 2: The baseline towards which the signal decays during the diastolic portion of the waveform.
+    
+    Overall, therefore, the waveform is modelled as a composite of signal due to the initial systolic pressure wave, an exponential decay, and two reflectance waves. For simplicity, the systolic and reflectance waves are henceforth referred to as the excess element, and the exponential decay as the decay element. The output of the model is a 12-parameter vector for each waveform, which can be used to construct a modelled wave fitting the original PPG data.
+    
+<img width="898" alt="Screenshot 2022-02-21 at 18 40 30" src="https://user-images.githubusercontent.com/63592847/155011100-33f58d5e-bf06-4997-84b8-59cabf55e647.png">
+
+A. The first 9 parameters of the model compose the excess element. TS = Timing of systolic wave; TR1 = Timing of 1st reflectance wave; TR2 = Timing of 2nd reflectance wave; AS = Amplitude of systolic wave; AR1 = Amplitude of 1st reflectance wave; AR2 = Amplitude of 2nd reflectance wave; WS = Width of systolic wave; WR1 = Width of 1st reflectance wave; WR2 = Width of 2nd reflectance wave. B. The final 3 parameters compose the decay element, which when incorporated with the excess yield the final modelled waveform. D R= Decay rate; B1 = 1st baseline; B2 = 2nd baseline.
+
+Below are three Bioradio-acquired waves fitted with the HED model. Each wave is recorded from a different individual and is of a different class. A. class 1, NRMSE 0.93; B. class 2, NRMSE 0.94; C. class 3, NRMSE 0.85 (values to two decimal places).
+
+<img width="903" alt="Screenshot 2022-02-21 at 18 41 47" src="https://user-images.githubusercontent.com/63592847/155011236-06b140ba-2a33-4ece-b206-197e3602ea6a.png">
+
+  - Model refinement: In refining the model's behaviour certain constraints were imposed. These were done according to the following assumptions:
+    - (i) component waves cannot have the same timing and must occur in order
+    - (ii) component waves cannot have negative amplitudes
+    - (iii) the first reflectance wave plays a relatively minor role in shaping the waveform and must therefore have the smallest amplitude and width
+    - (iv) the number of component waves need not be three if a more parsimonious fit can be achieved with fewer.
+
+
+
+
+
+
 We interpolate a cubic spline of the provided data points 
 `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
 and take its first derivative
