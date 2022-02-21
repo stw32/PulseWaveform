@@ -133,15 +133,18 @@ Overall, therefore, the waveform is modelled as a composite of signal due to the
 
 A. The first 9 parameters of the model compose the excess element. TS = Timing of systolic wave; TR1 = Timing of 1st reflectance wave; TR2 = Timing of 2nd reflectance wave; AS = Amplitude of systolic wave; AR1 = Amplitude of 1st reflectance wave; AR2 = Amplitude of 2nd reflectance wave; WS = Width of systolic wave; WR1 = Width of 1st reflectance wave; WR2 = Width of 2nd reflectance wave. B. The final 3 parameters compose the decay element, which when incorporated with the excess yield the final modelled waveform. D R= Decay rate; B1 = 1st baseline; B2 = 2nd baseline.
 
-Below are three Bioradio-acquired waves fitted with the HED model. Each wave is recorded from a different individual and is of a different class. A. class 1, NRMSE 0.93; B. class 2, NRMSE 0.94; C. class 3, NRMSE 0.85 (values to two decimal places).
+Below are three Bioradio-acquired waves fitted with the HED model. Each wave is recorded from a different individual and is of a different class. 
 
 <img width="903" alt="Screenshot 2022-02-21 at 18 41 47" src="https://user-images.githubusercontent.com/63592847/155011236-06b140ba-2a33-4ece-b206-197e3602ea6a.png">
 
-  - Model refinement: In refining the model's behaviour certain constraints were imposed. These were done according to the following assumptions:
-    - (i) component waves cannot have the same timing and must occur in order
-    - (ii) component waves cannot have negative amplitudes
-    - (iii) the first reflectance wave plays a relatively minor role in shaping the waveform and must therefore have the smallest amplitude and width
-    - (iv) the number of component waves need not be three if a more parsimonious fit can be achieved with fewer.
+A. class 1, NRMSE 0.93; B. class 2, NRMSE 0.94; C. class 3, NRMSE 0.85 (values to two decimal places).
+
+### Model refinement: 
+In refining the model's behaviour certain constraints were imposed. These were done according to the following assumptions:
+ - (i) component waves cannot have the same timing and must occur in order
+ - (ii) component waves cannot have negative amplitudes
+ - (iii) the first reflectance wave plays a relatively minor role in shaping the waveform and must therefore have the smallest amplitude and width
+ - (iv) the number of component waves need not be three if a more parsimonious fit can be achieved with fewer.
 
 
 
