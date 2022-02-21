@@ -175,7 +175,7 @@ Finally, the parameters are optimised using a downhill simplex routine (`simplex
 For each iteration of the simplex, ChiSq values are first determined for each vertex. The vertex with the highest value (poorest fit) is identified, and the structure of the simplex altered so as to reflect (or, alternatively, shrink) away from it. By reflecting away from the highest vertex (worst set of parameter values) over several iterations, the simplex moves ‘downhill’ until a minimum point is reached, where further reflections do not result in significant improvements in fit. The end result is a set of parameters optimized for goodness of fit. The simplex is restarted four times to mitigate the risk of convergence on local minima in multi-dimensional space. 
 
 ### Assessment of Model Performance:
-Following the completion of the downhill simplex routine, goodness of fit is calculated according to additional measures:
+Following the completion of the downhill simplex routine, goodness of fit is calculated according to additional measures using `model2.ChiSq4`:
 
 Normalized Root Mean Square Error (NRMSE):
 
@@ -188,6 +188,8 @@ An alternative calculation of NRMSE (aNRMSE):
 <img width="927" alt="Screenshot 2022-02-21 at 19 25 03" src="https://user-images.githubusercontent.com/63592847/155015760-0f711ec7-78de-46f2-9de2-44e1fcc7e9d6.png">
 
 The calculated aNRMSE value is an expression of the residual error as a percentage of the data. Values less than 2% are generally considered acceptable.
+
+Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapitulate relevant morphology as fiducial points O, S, N and D. 
 
 
 ## Alt
