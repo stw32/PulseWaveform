@@ -73,7 +73,7 @@ To extract fiducial point data the pre-processed time series must first be segme
     
 Identified peaks in the first derivative of a PPG time series are shown below. Peaks detected by the algorithm are shown as black circles. Prominent secondary peaks, precluding the use of a simple objective threshold, are indicated by red arrows.
 
-    <img width="818" alt="Screenshot 2022-02-21 at 12 45 09" src="https://user-images.githubusercontent.com/63592847/154957759-042ca7b0-3470-4804-a5fe-f46318b915c6.png">
+<img width="818" alt="Screenshot 2022-02-21 at 12 45 09" src="https://user-images.githubusercontent.com/63592847/154957759-042ca7b0-3470-4804-a5fe-f46318b915c6.png">
 
 
 We interpolate a cubic spline of the provided data points 
