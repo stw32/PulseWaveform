@@ -61,6 +61,17 @@ An example of an individual waveform from the ISO dataset, before and after prep
 <img width="940" alt="Screenshot 2022-02-20 at 17 20 49" src="https://user-images.githubusercontent.com/63592847/154855404-d6c94a1a-ef02-478c-975e-dab8bc0da43d.png">
 
 ## Beat Segmentation
+
+To extract fiducial point data the pre-processed time series must first be segmented into individual waveforms. This entails peak identification followed by identification of troughs, which mark the start and end of each beat. To ensure accuracy, inflection points crucial to peak and trough detection are identified from cubic splines of the data. The steps are as follows:
+
+  - Peak Detection: The `find_w` algorithm identifies peaks in the first derivative of the time series, denoted w.54 An adaptive rolling window is employed to identify successive peaks in the time series. Within the window, inflection points are confirmed as peaks if they exceed thresholds relative to values within the window and across the entire time series. The size of the window is determined from previous inter-beat intervals and is therefore adaptive to changes in heart rate. It is also adaptive in its ability to skip forward (over artefactual regions) or widen in the forward direction (if inadequate beats detected). Artefacts are also detected by the window, again according to local and global thresholds. Key assumptions made by the algorithm are as follows: 
+    - (i) The duration of an inter-beat interval can be reasonably approximated from the previous inter-beat interval. 
+    - (ii) All peaks are inflection points in the data above the 95th percentile for amplitude within the window. 
+    - (iii) Peaks with extreme amplitude values relative to adjacent peaks and the entire time series should be labelled as artefactual. 
+    - (iv) Extended windows with no identifiable peaks are likely low-amplitude artefactual regions. 
+    - (v) Peaks immediately preceding / following artefacts are likely to also be compromised and should therefore be removed.
+
+
 We interpolate a cubic spline of the provided data points 
 `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
 and take its first derivative
