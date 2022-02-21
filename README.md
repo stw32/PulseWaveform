@@ -7,11 +7,11 @@ An automated pipeline for the extraction of PPG waveform features, including the
 
 # Description
 
-This is a ReadMe for the PulseWaveform package and complementary analysis scripts as published in []. PulseWaveform contains a collection of functions for the processing and analysis of photoplethysmography (PPG) data. The General purpose script, located within the 'Scripts' folder in this repository, provides a foundational pipeline structure for implementing the package's functions to generate both morphological and HED model outputs that characterise the PPG pulse waveform. What follows is an expanded overview of the general analysis pipeline, in greater depth than was possible in the paper. Further details on assumptions made in constraining model behaviour are also included. Further clarification on code specifics can be found by examining the PulseWaveform.R file, which includes all functions with detailed comments. For any further queries beyond this, contact stw32@cam.ac.uk. 
+This is a ReadMe for the PulseWaveform package and complementary analysis scripts as published in []. PulseWaveform contains a collection of functions for the processing and analysis of photoplethysmography (PPG) data. The General purpose script, located within the 'Scripts' folder in this repository, provides a foundational pipeline structure for implementing the package's functions to generate both morphological and HED model outputs that characterise the PPG pulse waveform. What follows is an expanded overview of the general analysis pipeline, in greater depth than was possible in the paper. Further clarification on code specifics can be found by examining the PulseWaveform.R file, which includes all functions with detailed comments. For any further queries, please contact stw32@cam.ac.uk. 
 
 What is the Pulse Waveform? The fundamental signal inherent to PPG, reflecting the peripheral changes in blood volume and pressure corresponding to each heart beat. Waveforms vary in their shape depending on a number of psychological and physiological factors; a detailed characterisation of these changes in morphology is the primary purpose of this repository. 
 
-What is the HED Model? The Hybrid Excess and Decay Model is an attempt to parameterize the waveform such that it may bestow more useful information than simple descriptive measures of waveform morphology alone. It assumes each waveform is composed of component waves that suprimpose to produce the overall morphology (excess element), and that each component wave also has an exponential decay (decay element). 
+What is the HED Model? The Hybrid Excess and Decay Model is an attempt to parameterize the waveform such that it may bestow more useful information than simple descriptive measures of waveform morphology alone (Williamson et al). It assumes each waveform is composed of component waves that suprimpose to produce the overall morphology (excess element), and that each component wave also has an exponential decay (decay element). 
 
 ## Prerequisites
 Install PulseWaveform: devtools::install_github(repo = 'stw32/PulseWaveform')
@@ -65,7 +65,7 @@ An example of an individual waveform from the ISO dataset, before and after prep
 To extract fiducial point data the pre-processed time series must first be segmented into individual waveforms. This entails peak identification followed by identification of troughs, which mark the start and end of each beat. To ensure accuracy, inflection points crucial to peak and trough detection are identified from cubic splines of the data. The steps are as follows:
 
   - Cubic Spline Interpolation: 
-    - We interpolate a cubic spline from the existing data points `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
+    - A cubic spline is generated from existing data points `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
     - The first derivative of the spline is then calculated `deriv1 <- sfunction(seq(1, length(undetrended)), deriv = 1)`. 
 
   - Peak Detection: The `find_w` algorithm identifies peaks in the first derivative of the time series, denoted w. An adaptive rolling window is employed to identify successive peaks in the time series. Within the window, inflection points are confirmed as peaks if they exceed thresholds relative to values within the window and across the entire time series. The size of the window is determined from previous inter-beat intervals and is therefore adaptive to changes in heart rate. It is also adaptive in its ability to skip forward (over artefactual regions) or widen in the forward direction (if inadequate beats detected). Artefacts are also detected by the window, again according to local and global thresholds. Key assumptions made by the algorithm are as follows: 
@@ -123,12 +123,12 @@ A single prevailing physiological view on the nature of arterial waves and refle
  - (ii) A first reflectance wave, also described as the ‘renal’ wave’.
  - (iii) A second reflectance wave, often referred to as the ‘diastolic’ wave.
   
-PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
+PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology (Tigges et al, 2017). The current model starts from this point, modelling the waveform as a composite of three component waves: 
  - (i) systolic; 
  - (ii) first reflectance; 
  - (iii) second reflectance. 
     
-Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies, was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters are incorporated:
+Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies (Parker, 2017), was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters are incorporated:
  - (i) Decay rate: The rate at which the signal decays exponentially to baseline in the absence of component wave influence.
  - (ii) Baseline 1: The baseline towards which the signal decays during the systolic portion of the waveform. 
  - (iii) Baseline 2: The baseline towards which the signal decays during the diastolic portion of the waveform.
@@ -193,13 +193,13 @@ For each iteration of the simplex, ChiSq values are first determined for each ve
 ### Assessment of Model Performance:
 Following the completion of the downhill simplex routine, goodness of fit is calculated according to additional measures using `model2.ChiSq4`:
 
-Normalized Root Mean Square Error (NRMSE):
+Normalized Root Mean Square Error (NRMSE) (Sorelli et al):
 
 <img width="887" alt="Screenshot 2022-02-21 at 19 24 20" src="https://user-images.githubusercontent.com/63592847/155015675-cf987aea-136a-4e19-a5aa-8f5c4131cb4d.png">
 
 An NRMSE value of 1 indicates a perfect fit to the data, whilst a value of 0 indicates no improved performance over the null model.
 
-An alternative calculation of NRMSE (aNRMSE):
+An alternative calculation of NRMSE (aNRMSE) (Wang et al):
 
 <img width="927" alt="Screenshot 2022-02-21 at 19 25 03" src="https://user-images.githubusercontent.com/63592847/155015760-0f711ec7-78de-46f2-9de2-44e1fcc7e9d6.png">
 
@@ -226,3 +226,16 @@ We would love to hear from anyone who would like to contribute to PulseWaveform,
 This repository is maintained by stw32. Further methods for extracting meaningful features from the PPG pulse waveform may be added in due course. 
 
 # References
+Orphanidou, C. et al. Signal-Quality Indices for the Electrocardiogram and Photoplethysmogram: Derivation and Applications to Wireless Monitoring. IEEE J. Biomed. Health Inform. 19, 832–838 (2015).
+
+Parker, K. The reservoir-wave model | Atlantis Press. https://www.atlantis-press.com/journals/artres/125924989 (2017).
+
+Sorelli, M., Perrella, A. & Bocchi, L. Detecting Vascular Age Using the Analysis of Peripheral Pulse. IEEE Trans. Biomed. Eng. 65, 2742–2750 (2018).
+
+Tigges, T. et al. Model selection for the Pulse Decomposition Analysis of fingertip photoplethysmograms. in 2017 39th Annual International Conference of the IEEE Engineering in Medicine and Biology Society (EMBC) 4014–4017 (2017). doi:10.1109/EMBC.2017.8037736.
+
+Wang, L., Xu, L., Feng, S., Meng, M. Q.-H. & Wang, K. Multi-Gaussian fitting for pulse waveform using Weighted Least Squares and multi-criteria decision making method. Comput. Biol. Med. 43, 1661–1672 (2013).
+
+Williamson ST, Daniel-Watanabe L, Finnemann J, Powell C, Teed A, Paulus M, Khalsa SS, Fletcher PC. 2021 Characterising the Photoplethysmography Pulse Waveform for Use in Human Neuroscience: The Hybrid Excess and Decay (HED)
+Model. bioRxiv: http://doi.org/10.1101/2021.08.19.456935.
+
