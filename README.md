@@ -146,10 +146,21 @@ In refining the model's behaviour certain constraints were imposed. These were d
  - (iii) the first reflectance wave plays a relatively minor role in shaping the waveform and must therefore have the smallest amplitude and width
  - (iv) the number of component waves need not be three if a more parsimonious fit can be achieved with fewer.
 
+In the code, this manifests as penalties applied to goodness of fit (ChiSq) values when any of the following conditions are met:
+ - If any peak amplitudes are estimated as negative 
+ - If the peak width is estimated as <0.05s or >0.5s (units?) 
+ - If the width of the R1 peak is <0.1 or >0.25
+ - If the diastolic width is >0.45
+ - If the renal peak timing strays too far from initial parameter estimation
+ - If the S-peak deviates too far from the maxima of the beat
+ - If the timing of the diastolic is < 0.2
+ - If there is less than 0.1s between the peaks
+ - If there is a large shift between baselines
+ - If the configuration rate is above 0.95
+ - The renal peak is gradually penalised as the amplitude increase
 
 
-
-
+## Alt
 
 We interpolate a cubic spline of the provided data points 
 `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
@@ -218,8 +229,8 @@ Penalties are applied to the chi-sq value if any of the below conditions are met
 - If the renal peak timing strays too far from initial parameter estimation
 - If the S-peak deviates too far from the maxima of the beat
 - If the timing of the diastolic is < 0.2
-- If there is less than 0,1s between the peaks
-- If there is a large shift between baselines (Currently not applied!)
+- If there is less than 0.1s between the peaks
+- If there is a large shift between baselines
 - If the configuration rate is above 0.95
 - The renal peak is gradually penalised as the amplitude increase
 
