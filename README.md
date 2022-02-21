@@ -113,9 +113,9 @@ The cutoff thresholds for the above criteria were determined empirically and may
 ### Theoretical Foundations and Model Components:
 
 A single prevailing physiological view on the nature of arterial waves and reflections has not yet been reached, largely due to the inherent complexity of the arterial tree. Nonetheless it is generally accepted that backward travelling reflectance waves exist and are likely to be measurable as composites from multiple reflection sites, irrespective of origin. Hitherto, three component waves of the pulse waveform have been described:
-    - (i) A systolic wave caused by the increase in pressure arising from left ventricular contraction and ejection of stroke volume. 
-    - (ii) A first reflectance wave, also described as the ‘renal’ wave’.
-    - (iii) A second reflectance wave, often referred to as the ‘diastolic’ wave.
+ - (i) A systolic wave caused by the increase in pressure arising from left ventricular contraction and ejection of stroke volume. 
+ - (ii) A first reflectance wave, also described as the ‘renal’ wave’.
+ - (iii) A second reflectance wave, often referred to as the ‘diastolic’ wave.
   
 PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
     - (i) systolic; 
