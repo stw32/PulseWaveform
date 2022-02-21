@@ -104,7 +104,7 @@ The cutoff thresholds for the above criteria were determined empirically and may
      - (iii) O: The first value of the waveform, as defined during beat segmentation. In case of error during beat segmentation, a check for inflection points preceding w of lower amplitude is performed. O is reassigned if one is present.
      - (iv) S: The maximum of the waveform is taken as S. In the case of a maximum that does not correspond to S (i.e. due to reflectance wave augmentation in late systole), the timing from w to the maximum is calculated. If the timing exceeds an empirical threshold, S is instead defined as the point occurring a set time after w.
   
-  - Feature Extraction: Once OSND points have been identified, morphological features derived from them can be extracted. Table 1 outlines these, as well as additional features that are not solely calculated from fiducial points. The list is not extensive but does offer a comprehensive view of waveform morphology sufficient to quantify morphological differences between groups. Since fiducial points are already identified at this stage, additional measures can be incorporated with relative ease.
+  - Feature Extraction: Once OSND points have been identified, morphological features derived from them can be extracted using `feature_extract`. Table 1 outlines these, as well as additional features that are not solely calculated from fiducial points. The list is not extensive but does offer a comprehensive view of waveform morphology sufficient to quantify morphological differences between groups. Since fiducial points are already identified at this stage, additional measures can be incorporated with relative ease.
   
 <img width="542" alt="Screenshot 2022-02-21 at 18 31 14" src="https://user-images.githubusercontent.com/63592847/155010028-ffaa21f3-cf31-4277-9063-5f7a10ec27b8.png">
   
@@ -133,7 +133,7 @@ Overall, therefore, the waveform is modelled as a composite of signal due to the
 
 A. The first 9 parameters of the model compose the excess element. TS = Timing of systolic wave; TR1 = Timing of 1st reflectance wave; TR2 = Timing of 2nd reflectance wave; AS = Amplitude of systolic wave; AR1 = Amplitude of 1st reflectance wave; AR2 = Amplitude of 2nd reflectance wave; WS = Width of systolic wave; WR1 = Width of 1st reflectance wave; WR2 = Width of 2nd reflectance wave. B. The final 3 parameters compose the decay element, which when incorporated with the excess yield the final modelled waveform. D R= Decay rate; B1 = 1st baseline; B2 = 2nd baseline.
 
-Below are three Bioradio-acquired waves fitted with the HED model. Each wave is recorded from a different individual and is of a different class. 
+Below are three Bioradio-acquired waves fitted with the HED model (using `GGplotFits`). Each wave is recorded from a different individual and is of a different class. 
 
 <img width="903" alt="Screenshot 2022-02-21 at 18 41 47" src="https://user-images.githubusercontent.com/63592847/155011236-06b140ba-2a33-4ece-b206-197e3602ea6a.png">
 
@@ -146,9 +146,9 @@ In refining the model's behaviour certain constraints were imposed. These were d
  - (iii) the first reflectance wave plays a relatively minor role in shaping the waveform and must therefore have the smallest amplitude and width
  - (iv) the number of component waves need not be three if a more parsimonious fit can be achieved with fewer.
 
-In the code, this manifests as penalties applied to goodness of fit (ChiSq) values when any of the following conditions are met:
+In the code, this manifests as penalties applied to goodness of fit (ChiSq) values when any of the following conditions are met within the `model2.FIX_PAR3` function:
  - If any peak amplitudes are estimated as negative 
- - If the peak width is estimated as <0.05s or >0.5s (units?) 
+ - If the peak width is estimated as <0.05s or >0.5s 
  - If the width of the R1 peak is <0.1 or >0.25
  - If the diastolic width is >0.45
  - If the renal peak timing strays too far from initial parameter estimation
@@ -158,6 +158,36 @@ In the code, this manifests as penalties applied to goodness of fit (ChiSq) valu
  - If there is a large shift between baselines
  - If the configuration rate is above 0.95
  - The renal peak is gradually penalised as the amplitude increase
+ 
+### Parameter Optimisation:
+In modeling each waveform, a set of starting parameters are required to begin the fitting process. These are first estimated using `FindStartParams`. An estimated decay element is subtracted from each waveform to yield an 'excess' (see below). Once the excess is defined, peaks in the excess are searched for within empirically defined ranges. Values for width, timing and amplitude for each peak (the first 9 parameters) can then be estimated. The final 3 parameters are inputted as constants. 
+
+<img width="1091" alt="Screenshot 2022-02-21 at 19 06 34" src="https://user-images.githubusercontent.com/63592847/155013849-219d353f-6f5e-48b5-9fca-79642f623008.png">
+
+Starting parameters are then iteratively improved upon using `simplex.MakeSimplex2` for parameters fixed across beats, and `simplex.MakeSimplex3` and `FindWithinParams` for parameters with unique values for each beat. These improved parameters are combined into a matrix (`make_matrix`) for the next stage. The measure of goodness of fit by which parameters are improved is the reduced ChiSq function:
+
+<img width="788" alt="Screenshot 2022-02-21 at 19 20 00" src="https://user-images.githubusercontent.com/63592847/155015221-c031a5f6-ed2b-47c7-85f8-a9cbd2e10241.png">
+
+Residuals are calculated by subtracting a modelled version of the waveform, constructed with the parameter set, from the original. Central morphology (from w to D) residuals are weighted more heavily, such that the model tends to fit key features like the systolic decline and notch well without overfitting noise in the tail of diastolic decay.
+
+Finally, the parameters are optimised using a downhill simplex routine (`simplex.Run2`). A simplex is a geometric structure comprised of n + 1 vertices when generated in n-dimensional space. Thus it takes the form of a line in one dimension, a triangle in two dimensions, and a 13-vertex structure in 12 dimensions. In the case of the current model, each vertex of the simplex is defined by a different set of the 12 model parameters. 
+
+For each iteration of the simplex, ChiSq values are first determined for each vertex. The vertex with the highest value (poorest fit) is identified, and the structure of the simplex altered so as to reflect (or, alternatively, shrink) away from it. By reflecting away from the highest vertex (worst set of parameter values) over several iterations, the simplex moves ‘downhill’ until a minimum point is reached, where further reflections do not result in significant improvements in fit. The end result is a set of parameters optimized for goodness of fit. The simplex is restarted four times to mitigate the risk of convergence on local minima in multi-dimensional space. 
+
+### Assessment of Model Performance:
+Following the completion of the downhill simplex routine, goodness of fit is calculated according to additional measures:
+
+Normalized Root Mean Square Error (NRMSE):
+
+<img width="887" alt="Screenshot 2022-02-21 at 19 24 20" src="https://user-images.githubusercontent.com/63592847/155015675-cf987aea-136a-4e19-a5aa-8f5c4131cb4d.png">
+
+An NRMSE value of 1 indicates a perfect fit to the data, whilst a value of 0 indicates no improved performance over the null model.
+
+An alternative calculation of NRMSE (aNRMSE):
+
+<img width="927" alt="Screenshot 2022-02-21 at 19 25 03" src="https://user-images.githubusercontent.com/63592847/155015760-0f711ec7-78de-46f2-9de2-44e1fcc7e9d6.png">
+
+The calculated aNRMSE value is an expression of the residual error as a percentage of the data. Values less than 2% are generally considered acceptable.
 
 
 ## Alt
