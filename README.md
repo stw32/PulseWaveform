@@ -64,7 +64,7 @@ An example of an individual waveform from the ISO dataset, before and after prep
 
 To extract fiducial point data the pre-processed time series must first be segmented into individual waveforms. This entails peak identification followed by identification of troughs, which mark the start and end of each beat. To ensure accuracy, inflection points crucial to peak and trough detection are identified from cubic splines of the data. The steps are as follows:
 
-  - Peak Detection: The `find_w` algorithm identifies peaks in the first derivative of the time series, denoted w.54 An adaptive rolling window is employed to identify successive peaks in the time series. Within the window, inflection points are confirmed as peaks if they exceed thresholds relative to values within the window and across the entire time series. The size of the window is determined from previous inter-beat intervals and is therefore adaptive to changes in heart rate. It is also adaptive in its ability to skip forward (over artefactual regions) or widen in the forward direction (if inadequate beats detected). Artefacts are also detected by the window, again according to local and global thresholds. Key assumptions made by the algorithm are as follows: 
+  - Peak Detection: The `find_w` algorithm identifies peaks in the first derivative of the time series, denoted w. An adaptive rolling window is employed to identify successive peaks in the time series. Within the window, inflection points are confirmed as peaks if they exceed thresholds relative to values within the window and across the entire time series. The size of the window is determined from previous inter-beat intervals and is therefore adaptive to changes in heart rate. It is also adaptive in its ability to skip forward (over artefactual regions) or widen in the forward direction (if inadequate beats detected). Artefacts are also detected by the window, again according to local and global thresholds. Key assumptions made by the algorithm are as follows: 
     - (i) The duration of an inter-beat interval can be reasonably approximated from the previous inter-beat interval. 
     - (ii) All peaks are inflection points in the data above the 95th percentile for amplitude within the window. 
     - (iii) Peaks with extreme amplitude values relative to adjacent peaks and the entire time series should be labelled as artefactual. 
@@ -74,6 +74,36 @@ To extract fiducial point data the pre-processed time series must first be segme
 Identified peaks in the first derivative of a PPG time series are shown below. Peaks detected by the algorithm are shown as black circles. Prominent secondary peaks, precluding the use of a simple objective threshold, are indicated by red arrows.
 
 <img width="818" alt="Screenshot 2022-02-21 at 12 45 09" src="https://user-images.githubusercontent.com/63592847/154957759-042ca7b0-3470-4804-a5fe-f46318b915c6.png">
+
+  - Trough Detection: The minima preceding w, denoted O, are calculated as the inflection points preceding w, using `find_o`. In the absence of an inflection point, O points are derived from inflection points preceding w in the first derivative. The removal of baseline wander as mentioned above is achieved through cubic spline interpolation of O points. The constructed spline is then subtracted from the signal.
+  
+On completion of peak and trough detection, inter-beat intervals between adjacent w peaks are used to calculate heart rate and heart rate variability. O points defining the start and end of each beat are then used to derive individual beat segments. Once segmented, waveforms are scaled for amplitude (an optional feature) and aligned in time by w. The figure below shows a sample of aligned beats with the average (mean) waveform overlayed in red. 
+
+
+## Cleaning
+
+Waveforms heavily influenced by noise are more likely to yield inaccurate features and should be removed. The peak detection algorithm (`find_w`) outlined above excludes major artefacts but is unlikely to detect subtler deformations in morphology due to less pronounced movements (e.g speaking). Therefore, a cleaning step to assess each waveform’s quality is included after beat segmentation and before feature extraction.
+
+The approach to assessing waveform quality follows closely that of Orphanidou et al. The main principle is to utilize the average waveform of a sample, to which all individual waves can be compared. The `sep_beats` function is applied to exclude beats with the following features: 
+  - (i) Wave length: wave segments that are excessively long or short relative to adjacent waveforms and the average
+  - (ii) Two peaks: segments with two maxima suggestive of two systolic peaks (e.g ectopic beats)
+  - (iii) Values below baseline: segments with values significantly below the corrected baseline
+  - (iv) Standard Deviations from the Average: Segments with values exceeding a defined number of standard deviations from the average
+  - (v) Standard Deviation of Residuals: A set of residual values is first calculated by subtracting a given waveform from the average. The standard deviation of all residual values is then calculated. Beat segments with high residual values due to physiological change tend to have consistent residual values, whereas beat segments with high residual values due to noise tend to have inconsistent residual values. Therefore, waves with noise can be removed more selectively.
+  
+The cutoff thresholds for the above criteria were determined empirically and may need adjusting for new datasets. `PlotRejects` plots the number of beats rejected for each criterion and can be used at the end of the pipeline to assess if adjustments to thresholds are needed. Below is an example of an aligned set of segmented beats before and after cleaning.
+
+## Morphological Feature Extraction
+
+  - Fiducial Point Identification: To obtain morphological features, key fiducial points OSND must first be identified on each waveform. The first derivative is utilized for this purpose. To increase robustness, OSND values for the average wave of a sample are identified first (`osnd_of_average`) and inform identification of points on individual waves. For each wave, values are identified in the following order: 
+     - (i) N: The notch is assumed to occur between S and D as identified on the average wave. Within this section, inflection points in the first derivative are identified. The point with the greatest amplitude is selected, and the immediately preceding inflection point on the original trace is labelled as N. In the absence of a notch, the inflection point closest to zero in the first derivative is instead identified, and the corresponding point on the original waveform is taken as N.
+     - (ii) D: The peak following N is taken as D. If no peak follows N, D is assumed to have the same value as N (i.e. the waveform is presumed to be class 3 or above).
+     - (iii) O: The first value of the waveform, as defined during beat segmentation. In case of error during beat segmentation, a check for inflection points preceding w of lower amplitude is performed. O is reassigned if one is present.
+     - (iv) S: The maximum of the waveform is taken as S. In the case of a maximum that does not correspond to S (i.e. due to reflectance wave augmentation in late systole), the timing from w to the maximum is calculated. If the timing exceeds an empirical threshold, S is instead defined as the point occurring a set time after w.
+  
+  - Feature Extraction: Once OSND points have been identified, morphological features derived from them can be extracted. Table 1 outlines these, as well as additional features that are not solely calculated from fiducial points. The list is not extensive but does offer a comprehensive view of waveform morphology sufficient to quantify morphological differences between groups. Since fiducial points are already identified at this stage, additional measures can be incorporated with relative ease.
+  
+## Pulse Decomposition Modelling: The HED Model
 
 
 We interpolate a cubic spline of the provided data points 
@@ -94,7 +124,7 @@ The `sep_beats` function then takes care of some rudimentary cleaning procedures
 - waves that have a second systolic upstroke are removed  
 - waves that fall below the O-O threshold (currently hardcoded to 4?) are excluded  
 - waves that deviate more than 2 SDs from the average in their residuals
-- waves that deviate more than 5 standard deviatiosn from the average wave (calculated after all of the above are already excluded) are removed  
+- waves that deviate more than 5 standard deviatiosn from the average wave (calculated after all of the above are already excluded) are removed   
 - when `subset == T` is only necessary for the identification of a subset of data with an autonomic arousal manipulation (based on inter.beat intervals)  
 
 In the next step, in the `FindStartParams` function each beat is modelled as a composition of three peaks (S, D and N) with parameters determining the amplitude, timing and width of each within the dataframe `beat`: `STime`, `SAmplitude` `SWidth` and so forth. Initial parameters are estimated using the excess of each beat which is what is left once the assumed decay towards a variable baseline is factored out:     
@@ -150,3 +180,5 @@ Penalties are applied to the chi-sq value if any of the below conditions are met
 
 # Contributing 
 We would love to hear from people who would like to contribute or have ideas for developing out model further. 
+
+# References
