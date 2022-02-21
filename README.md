@@ -207,6 +207,9 @@ The calculated aNRMSE value is an expression of the residual error as a percenta
 
 Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapitulate relevant morphology as fiducial points O, S, N and D.
 
+## Outputs
+
+
 # Contributing 
 We would love to hear from anyone who would like to contribute to PulseWaveform, or who has ideas for developing the HED model further. 
 
