@@ -114,17 +114,13 @@ The cutoff thresholds for the above criteria were determined empirically and may
     - (i) A systolic wave caused by the increase in pressure arising from left ventricular contraction and ejection of stroke volume. 
     - (ii) A first reflectance wave, also described as the ‘renal’ wave’.
     - (iii) A second reflectance wave, often referred to as the ‘diastolic’ wave.
-    
-PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
+    PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
     - (i) systolic; 
     - (ii) first reflectance; 
     - (iii) second reflectance waves. 
-Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. 
-    
-  The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies,86 was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters were incorporated:
+    Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies,86 was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters were incorporated:
     - (i) Decay rate: The rate at which the signal decays exponentially to baseline in the absence of component wave influence.      - (ii) Baseline 1: The baseline towards which the signal decays during the systolic portion of the waveform. 
     - (iii) Baseline 2: The baseline towards which the signal decays during the diastolic portion of the waveform.
-    
     Overall, therefore, the waveform is modelled as a composite of signal due to the initial systolic pressure wave, an exponential decay, and two reflectance waves. For simplicity, the systolic and reflectance waves are henceforth referred to as the excess element, and the exponential decay as the decay element. The output of the model is a 12-parameter vector for each waveform, which can be used to construct a modelled wave fitting the original PPG data.
     
 <img width="898" alt="Screenshot 2022-02-21 at 18 40 30" src="https://user-images.githubusercontent.com/63592847/155011100-33f58d5e-bf06-4997-84b8-59cabf55e647.png">
