@@ -1,10 +1,6 @@
 # PulseWaveform
 An automated pipeline for the extraction of PPG waveform features, including the Hybrid Excess and Decay (HED) model for extraction of component wave features.
 
-
-```{r setup, include=FALSE}
-```
-
 # Description
 
 This is a ReadMe for the PulseWaveform package and complementary analysis scripts as published in []. PulseWaveform contains a collection of functions for the processing and analysis of photoplethysmography (PPG) data. The General purpose script, located within the 'Scripts' folder in this repository, provides a foundational pipeline structure for implementing the package's functions to generate both morphological and HED model outputs that characterise the PPG pulse waveform. What follows is an expanded overview of the general analysis pipeline, in greater depth than was possible in the paper. Further clarification on code specifics can be found by examining the PulseWaveform.R file, which includes all functions with detailed comments. For any further queries, please contact []. 
@@ -211,7 +207,7 @@ Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapit
 Outputs from the analysis pipeline can be broadly classified as:
   - Morphological feature outputs
   - HED model parameter outputs
-  - HED Model Performance 
+  - HED Model Performance (goodness of fit measures)
   - Inter-beat intervals 
   - Metadata (number of beats in sample, number of beats rejected through cleaning)
   - Processed PPG data (individual waveforms, OSND values) 
