@@ -208,6 +208,15 @@ The calculated aNRMSE value is an expression of the residual error as a percenta
 Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapitulate relevant morphology as fiducial points O, S, N and D.
 
 ## Outputs
+Outputs from the analysis pipeline can be broadly classified as:
+  - Morphological feature outputs
+  - HED model parameter outputs
+  - HED Model Performance 
+  - Inter-beat intervals 
+  - Metadata (number of beats in sample, number of beats rejected through cleaning)
+  - Processed PPG data (individual waveforms, OSND values) 
+  
+They are stored within the `AllOutputs` list, which acts as the input to the ISO_study_analysis_script within the Scripts folder, though custom analysis scripts will likely be required for novel data. 
 
 
 # Contributing 
