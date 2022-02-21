@@ -79,6 +79,7 @@ Identified peaks in the first derivative of a PPG time series are shown below. P
   
 On completion of peak and trough detection, inter-beat intervals between adjacent w peaks are used to calculate heart rate and heart rate variability. O points defining the start and end of each beat are then used to derive individual beat segments. Once segmented, waveforms are scaled for amplitude (an optional feature) and aligned in time by w. The figure below shows a sample of aligned beats with the average (mean) waveform overlayed in red. 
 
+<img width="710" alt="Screenshot 2022-02-21 at 18 26 31" src="https://user-images.githubusercontent.com/63592847/155009496-55803e90-c3bd-4114-b5c9-f10a4244acd7.png">
 
 ## Cleaning
 
@@ -93,6 +94,8 @@ The approach to assessing waveform quality follows closely that of Orphanidou et
   
 The cutoff thresholds for the above criteria were determined empirically and may need adjusting for new datasets. `PlotRejects` plots the number of beats rejected for each criterion and can be used at the end of the pipeline to assess if adjustments to thresholds are needed. Below is an example of an aligned set of segmented beats before and after cleaning.
 
+<img width="881" alt="Screenshot 2022-02-21 at 18 27 07" src="https://user-images.githubusercontent.com/63592847/155009585-2ce4b92e-e576-491b-a8d5-d421c0f9c651.png">
+
 ## Morphological Feature Extraction
 
   - Fiducial Point Identification: To obtain morphological features, key fiducial points OSND must first be identified on each waveform. The first derivative is utilized for this purpose. To increase robustness, OSND values for the average wave of a sample are identified first (`osnd_of_average`) and inform identification of points on individual waves. For each wave, values are identified in the following order: 
@@ -103,8 +106,9 @@ The cutoff thresholds for the above criteria were determined empirically and may
   
   - Feature Extraction: Once OSND points have been identified, morphological features derived from them can be extracted. Table 1 outlines these, as well as additional features that are not solely calculated from fiducial points. The list is not extensive but does offer a comprehensive view of waveform morphology sufficient to quantify morphological differences between groups. Since fiducial points are already identified at this stage, additional measures can be incorporated with relative ease.
   
+<img width="542" alt="Screenshot 2022-02-21 at 18 31 14" src="https://user-images.githubusercontent.com/63592847/155010028-ffaa21f3-cf31-4277-9063-5f7a10ec27b8.png">
+  
 ## Pulse Decomposition Modelling: The HED Model
-
 
 We interpolate a cubic spline of the provided data points 
 `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
