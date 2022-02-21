@@ -64,6 +64,10 @@ An example of an individual waveform from the ISO dataset, before and after prep
 
 To extract fiducial point data the pre-processed time series must first be segmented into individual waveforms. This entails peak identification followed by identification of troughs, which mark the start and end of each beat. To ensure accuracy, inflection points crucial to peak and trough detection are identified from cubic splines of the data. The steps are as follows:
 
+  - Cubic Spline Interpolation: 
+    - We interpolate a cubic spline from the existing data points `sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
+    - The first derivative of the spline is then calculated `deriv1 <- sfunction(seq(1, length(undetrended)), deriv = 1)`. 
+
   - Peak Detection: The `find_w` algorithm identifies peaks in the first derivative of the time series, denoted w. An adaptive rolling window is employed to identify successive peaks in the time series. Within the window, inflection points are confirmed as peaks if they exceed thresholds relative to values within the window and across the entire time series. The size of the window is determined from previous inter-beat intervals and is therefore adaptive to changes in heart rate. It is also adaptive in its ability to skip forward (over artefactual regions) or widen in the forward direction (if inadequate beats detected). Artefacts are also detected by the window, again according to local and global thresholds. Key assumptions made by the algorithm are as follows: 
     - (i) The duration of an inter-beat interval can be reasonably approximated from the previous inter-beat interval. 
     - (ii) All peaks are inflection points in the data above the 95th percentile for amplitude within the window. 
@@ -85,9 +89,9 @@ On completion of peak and trough detection, inter-beat intervals between adjacen
 
 Waveforms heavily influenced by noise are more likely to yield inaccurate features and should be removed. The peak detection algorithm (`find_w`) outlined above excludes major artefacts but is unlikely to detect subtler deformations in morphology due to less pronounced movements (e.g speaking). Therefore, a cleaning step to assess each waveform’s quality is included after beat segmentation and before feature extraction.
 
-The approach to assessing waveform quality follows closely that of Orphanidou et al. The main principle is to utilize the average waveform of a sample, to which all individual waves can be compared. The `sep_beats` function is applied to exclude beats with the following features: 
+The approach to assessing waveform quality follows closely that of Orphanidou et al. The main principle is to utilize the average waveform of a sample, to which all individual waves can be compared*. The `sep_beats` function is applied to exclude beats with the following features: 
   - (i) Wave length: wave segments that are excessively long or short relative to adjacent waveforms and the average
-  - (ii) Two peaks: segments with two maxima suggestive of two systolic peaks (e.g ectopic beats)
+  - (ii) Two peaks: segments with two maxima (or a rising tail portion) suggestive of two systolic peaks (e.g ectopic beats)
   - (iii) Values below baseline: segments with values significantly below the corrected baseline
   - (iv) Standard Deviations from the Average: Segments with values exceeding a defined number of standard deviations from the average
   - (v) Standard Deviation of Residuals: A set of residual values is first calculated by subtracting a given waveform from the average. The standard deviation of all residual values is then calculated. Beat segments with high residual values due to physiological change tend to have consistent residual values, whereas beat segments with high residual values due to noise tend to have inconsistent residual values. Therefore, waves with noise can be removed more selectively.
@@ -95,6 +99,8 @@ The approach to assessing waveform quality follows closely that of Orphanidou et
 The cutoff thresholds for the above criteria were determined empirically and may need adjusting for new datasets. `PlotRejects` plots the number of beats rejected for each criterion and can be used at the end of the pipeline to assess if adjustments to thresholds are needed. Below is an example of an aligned set of segmented beats before and after cleaning.
 
 <img width="881" alt="Screenshot 2022-02-21 at 18 27 07" src="https://user-images.githubusercontent.com/63592847/155009585-2ce4b92e-e576-491b-a8d5-d421c0f9c651.png">
+
+* setting `subset == T` for `sep_beats` allows only a subset of beats to be taken forward in the analysis pipeline. It is only necessary for autonomic arousal manipulations where inter-beat intervals are altered (such as the ISO study). 
 
 ## Morphological Feature Extraction
 
@@ -164,7 +170,17 @@ In modeling each waveform, a set of starting parameters are required to begin th
 
 <img width="1091" alt="Screenshot 2022-02-21 at 19 06 34" src="https://user-images.githubusercontent.com/63592847/155013849-219d353f-6f5e-48b5-9fca-79642f623008.png">
 
-Starting parameters are then iteratively improved upon using `simplex.MakeSimplex2` for parameters fixed across beats, and `simplex.MakeSimplex3` and `FindWithinParams` for parameters with unique values for each beat. These improved parameters are combined into a matrix (`make_matrix`) for the next stage. The measure of goodness of fit by which parameters are improved is the reduced ChiSq function:
+Starting parameters are then iteratively improved upon using `simplex.MakeSimplex2` for parameters fixed across beats:
+- The width of S, R1 and R2
+- The timing for R1 and R2
+- The config rate
+
+and `simplex.MakeSimplex3` and `FindWithinParams` for parameters with unique values for each beat:
+- The timing of S
+- The amplitude of S, R1 and R2
+- The two baseline values 
+
+These improved parameters are combined into a matrix (`make_matrix`) for the next stage. The measure of goodness of fit by which parameters are improved is the reduced ChiSq function:
 
 <img width="788" alt="Screenshot 2022-02-21 at 19 20 00" src="https://user-images.githubusercontent.com/63592847/155015221-c031a5f6-ed2b-47c7-85f8-a9cbd2e10241.png">
 
@@ -172,7 +188,7 @@ Residuals are calculated by subtracting a modelled version of the waveform, cons
 
 Finally, the parameters are optimised using a downhill simplex routine (`simplex.Run2`). A simplex is a geometric structure comprised of n + 1 vertices when generated in n-dimensional space. Thus it takes the form of a line in one dimension, a triangle in two dimensions, and a 13-vertex structure in 12 dimensions. In the case of the current model, each vertex of the simplex is defined by a different set of the 12 model parameters. 
 
-For each iteration of the simplex, ChiSq values are first determined for each vertex. The vertex with the highest value (poorest fit) is identified, and the structure of the simplex altered so as to reflect (or, alternatively, shrink) away from it. By reflecting away from the highest vertex (worst set of parameter values) over several iterations, the simplex moves ‘downhill’ until a minimum point is reached, where further reflections do not result in significant improvements in fit. The end result is a set of parameters optimized for goodness of fit. The simplex is restarted four times to mitigate the risk of convergence on local minima in multi-dimensional space. 
+For each iteration of the simplex, ChiSq values are first determined for each vertex. The vertex with the highest value (poorest fit) is identified, and the structure of the simplex altered so as to reflect (or, alternatively, shrink) away from it. By reflecting away from the highest vertex (worst set of parameter values) over several iterations, the simplex moves ‘downhill’ until a minimum point is reached, where further reflections do not result in significant improvements in fit. The end result is a set of parameters optimized for goodness of fit. The parameter values are then extracted using `extractOutput`. Finally, `fixOutput` is utilised to ensure that there are no excessive deviations of the new parameters from initial estimations and established constraints. The simplex is restarted four times to mitigate the risk of convergence on local minima in multi-dimensional space. 
 
 ### Assessment of Model Performance:
 Following the completion of the downhill simplex routine, goodness of fit is calculated according to additional measures using `model2.ChiSq4`:
@@ -189,84 +205,12 @@ An alternative calculation of NRMSE (aNRMSE):
 
 The calculated aNRMSE value is an expression of the residual error as a percentage of the data. Values less than 2% are generally considered acceptable.
 
-Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapitulate relevant morphology as fiducial points O, S, N and D. 
-
-
-## Alt
-
-We interpolate a cubic spline of the provided data points 
-`sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")`
-and take its first derivative
-`deriv1 <- sfunction(seq(1, length(undetrended)), deriv = 1)`. 
-Then the maximum of the first derivative, called the W point(s) are found:  
-`w <- find_w(d1p = deriv1Poly, deriv1 = deriv1, sp = splinePoly, sr = samplingRate)`
-![](Wpoint.png)  
-Beat segmentation is based on the correct identification of the W points.  
-Next U, V and O are detected.
-Based on the O points we remove a baseline in order to filter out low frequency modulation of the signal without altering the morphology of individual waveforms. 
-![](baseline.png)  
- 
-The `sep_beats` function then takes care of some rudimentary cleaning procedures - plotting options of the outliers can be added by setting `q = TRUE`:   
-- long waves (where a distance of more than two waves (Os) was counted as one) are removed  provided the waves to either side of them are not similarly long (if so there is a plotting option to make a manual decision)
-- abnormally high amplitude
-- waves that have a second systolic upstroke are removed  
-- waves that fall below the O-O threshold (currently hardcoded to 4?) are excluded  
-- waves that deviate more than 2 SDs from the average in their residuals
-- waves that deviate more than 5 standard deviatiosn from the average wave (calculated after all of the above are already excluded) are removed   
-- when `subset == T` is only necessary for the identification of a subset of data with an autonomic arousal manipulation (based on inter.beat intervals)  
-
-In the next step, in the `FindStartParams` function each beat is modelled as a composition of three peaks (S, D and N) with parameters determining the amplitude, timing and width of each within the dataframe `beat`: `STime`, `SAmplitude` `SWidth` and so forth. Initial parameters are estimated using the excess of each beat which is what is left once the assumed decay towards a variable baseline is factored out:     
-`excess[1] = data[1,2] - (baseline + config.rate*(yPrev-baseline))`
-
-The width of each peak is initialised at 0.25 i.e. `par[4] <- 0.25`. 
-
-
-## Improving fit using downhill simplex
-
-To estimate the timing of the first and second reflectance peaks, we take the median of the time values generated by the initial parameter estimation.
-
-`  renal_param <- median(beat$NTime)`
-
-`  dias_param <- median(beat$DTime)`
-
-Then we begin to refine the parameters originally generated by `FindStartParams`. We extract both within and across beat parameters. 
-The across beat parameters extracted are those that are expected to be held constant across beats. These are:
-
-- The width of S, R1 and R2
-- The timing for R1 and R2
-- The config rate
-
-These parameters are fed into the `simplex.MakeSimplex2` function. This function slightly improves each of the across beat parameters, and outputs a suitable matrix to feed into the downhill simplex algorithm. For further explanation about the simplex creation and algorithm, please refer to Numerical Recipes (Press, Teukolsky, Vetterling & Flannery, 2007).
-
-The within beat parameters produced are those which are able to vary from beat to beat. These are:
-
-- The timing of S
-- The amplitude of S, R1 and R2
-- The two baseline values 
-
-These parameters are fed into the `FindWithinParams` function, which subsequently feeds into a simplex. This improves each of the within beat parameters and outputs a suitable matrix for the downhill simplex algorithm. The distinction between this and the across beat parameters is that the within beat parameter values are calculated for each individual beat, whereas the across beat parameters are calculated for each batch.
-
-The within and across beat parameters are combined into a matrix, and then fed into the downhill simplex algorithm, which iteratively improves the parameter estimation by minimizing the chi-sq value. The improved parameter values are extracted using `extractOutput`. Finally, `fixOutput` is utilised to ensure that there are no excessive deviations of the new parameters from our original estimations.
-
-This process is then iterated upon four times, to ensure a the simplex does not get stuck in local minima. 
-
-
-## Penalties applied to the chi-sq value
-Penalties are applied to the chi-sq value if any of the below conditions are met: 
-
-- If any peak amplitudes are estimated as negative 
-- If the peak width is estimated as <0.05s or >0.5s (units?) 
-- If the width of the R1 peak is <0.1 or >0.25
-- If the diastolic width is >0.45
-- If the renal peak timing strays too far from initial parameter estimation
-- If the S-peak deviates too far from the maxima of the beat
-- If the timing of the diastolic is < 0.2
-- If there is less than 0.1s between the peaks
-- If there is a large shift between baselines
-- If the configuration rate is above 0.95
-- The renal peak is gradually penalised as the amplitude increase
+Furthermore, `osnd_fit` can be used to assess the HED model's ability to recapitulate relevant morphology as fiducial points O, S, N and D.
 
 # Contributing 
-We would love to hear from people who would like to contribute or have ideas for developing out model further. 
+We would love to hear from anyone who would like to contribute to PulseWaveform, or who has ideas for developing the HED model further. 
+
+# Version Updates
+This repository is maintained by stw32. Further methods for extracting meaningful features from the PPG pulse waveform may be added in due course. 
 
 # References
