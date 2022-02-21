@@ -120,10 +120,11 @@ A single prevailing physiological view on the nature of arterial waves and refle
 PDA models have taken a largely data-driven approach to decomposing the waveform, using combinations of component waves of varying number and shape. Comparisons of these suggest three to be the optimal number for capturing the waveform’s morphology. The current model starts from this point, modelling the waveform as a composite of three component waves: 
  - (i) systolic; 
  - (ii) first reflectance; 
- - (iii) second reflectance waves. 
+ - (iii) second reflectance. 
     
-Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies,86 was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters were incorporated:
- - (i) Decay rate: The rate at which the signal decays exponentially to baseline in the absence of component wave influence.      - (ii) Baseline 1: The baseline towards which the signal decays during the systolic portion of the waveform. 
+Nine parameters are used to model the timing, width and amplitude of each component wave, as shown below. The current model, however, differs from existing PDA models in its approach to modelling the diastolic decay. A tendency for waves of prolonged duration to decay below baseline, an established phenomenon in aortic studies, was noted in the PPG signal. This is not considered by current PDA models. To account for this and better elucidate the underlying factors driving waveform morphology, a further three parameters are incorporated:
+ - (i) Decay rate: The rate at which the signal decays exponentially to baseline in the absence of component wave influence.
+ - (ii) Baseline 1: The baseline towards which the signal decays during the systolic portion of the waveform. 
  - (iii) Baseline 2: The baseline towards which the signal decays during the diastolic portion of the waveform.
     
 Overall, therefore, the waveform is modelled as a composite of signal due to the initial systolic pressure wave, an exponential decay, and two reflectance waves. For simplicity, the systolic and reflectance waves are henceforth referred to as the excess element, and the exponential decay as the decay element. The output of the model is a 12-parameter vector for each waveform, which can be used to construct a modelled wave fitting the original PPG data.
