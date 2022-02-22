@@ -394,7 +394,7 @@ find_u_v <- function(wx, wy, d1, d1p, spline, sr = samplingRate, plot = FALSE){
     preHalfHeights <- solve(d1PeakSub, b = wHalfHeight[i])                                    # Identify the x-coordinates of the new spline when the y-value = the half maximum
 
     if(length(preHalfHeights) < 2){                                                           # If only one coordinate is found, extend the length of the spline,
-      d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-(sr/4)):(round(wx[i])+(sr/4)), # and search again
+      d1PeakSub <- CubicInterpSplineAsPiecePoly((round(wx[i])-(sr/4)):(round(wx[i])+(sr/4)),  # and search again
                               d1[(round(wx[i])-(sr/4)):(round(wx[i])+(sr/4))], "natural")
       preHalfHeights <- solve(d1PeakSub, b = wHalfHeight[i])
     }
