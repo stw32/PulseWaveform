@@ -24,8 +24,9 @@ The PulseWaveform package and associated pipelines make use of the following pac
 
 ## Scripts
 Within the scripts folder the General purpose script can be found. Also included in the folder:
-  - ISO study main script: the processing pipeline adapted for the ISO study analysis
+  - ISO study main script: the processing pipeline adapted for the ISO study analysis.
   - ISO study analysis script: the analysis script for the ISO study, including the code used to generate the figures in the paper []. 
+  - Archived folder: contains PulseWaveform functions in their older, uncommented form.
 
 # Analysis Pipeline:
 The general analysis pipeline's structure is illustrated below. Pulse decomposition modelling (and subsequent outputs) are optional and can be bypassed if only descriptive morphological features are desired. 
