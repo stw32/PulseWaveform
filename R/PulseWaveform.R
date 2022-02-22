@@ -885,8 +885,8 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
   for(i in 1:length(wuv$wX)){
 
     splPolySub <- CubicInterpSplineAsPiecePoly((round(wuv$uX[i])-15):(round(wuv$uX[i]) +      # For each peak (w point) a rough segment around it is demarcated
-                                                                        (wvlen+10)), sourcedata[(round(wuv$uX[i])-15):(round(wuv$uX[i]) +
-                                                                                                                         (wvlen+10))], "natural")
+                  (wvlen+10)), sourcedata[(round(wuv$uX[i])-15):(round(wuv$uX[i]) +
+                  (wvlen+10))], "natural")
 
     splSub <- predict(splPolySub, c(seq((wuv$uX[i]-14), (wuv$uX[i]+(wvlen+4)), 0.1)))         # Segment is discretized
     splSub <-  as.data.frame(splSub)
@@ -903,13 +903,18 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
       halfCross <- solve(splPolySub2, b = 0.5, deriv = 0)
       halfCross <- halfCross[which(abs(halfCross - wuv$wX[i]) ==                              # Waves are aligned relative to this value (empirically this method has lead to better alignments than aligning by w alone)
                                      min(abs(halfCross - wuv$wX[i])))]
-      if(halfCross-14 < splPolySub$knots[1] | halfCross+(wvlen+4) > splPolySub$knots[length(splPolySub$knots)]){
-        splSub2 <- predict(splPolySub, c(seq((splPolySub$knots[1]), (splPolySub$knots[length(splPolySub$knots)]), 0.1)))
-        splSub2 <-  as.data.frame(splSub2)
-        splSub2 <- cbind(splSub2, c(seq((splPolySub$knots[1]), (splPolySub$knots[length(splPolySub$knots)]), 0.1)))
+      if(halfCross-14 < splPolySub$knots[1] |
+         halfCross+(wvlen+4) > splPolySub$knots[length(splPolySub$knots)]){
+        splSub2 <- predict(splPolySub,
+                   c(seq((splPolySub$knots[1]),
+                   (splPolySub$knots[length(splPolySub$knots)]), 0.1)))
+        splSub2 <- as.data.frame(splSub2)
+        splSub2 <- cbind(splSub2, c(seq((splPolySub$knots[1]),
+                   (splPolySub$knots[length(splPolySub$knots)]), 0.1)))
       }else{
-        splSub2 <- predict(splPolySub, c(seq((halfCross-14), (halfCross+(wvlen+4)), 0.1)))
-        splSub2 <-  as.data.frame(splSub2)
+        splSub2 <- predict(splPolySub,
+                   c(seq((halfCross-14), (halfCross+(wvlen+4)), 0.1)))
+        splSub2 <- as.data.frame(splSub2)
         splSub2 <- cbind(splSub2, c(seq((halfCross-14), (halfCross+(wvlen+4)), 0.1)))
       }
       colnames(splSub2) <- c('y', 'x')
@@ -992,7 +997,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     }
   }
   extra_long_wave <- extra_long_wave[!is.na(extra_long_wave)]
-  if(length(extra_long_wave) > 0){                                                          # Exclude identified waveforms, report rejection with option to plot if q = TRUE
+  if(length(extra_long_wave) > 0){                                                            # Exclude identified waveforms, report rejection with option to plot if q = TRUE
     cat("\n", length(extra_long_wave), "/", (ncol(pulse)-1),
         "waves removed for being abnormally long")
     if(q == TRUE){
@@ -1112,7 +1117,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     wave <- pulse[, i]
     wave <- wave[!is.na(wave)]
     if(wave[length(wave)] > 0.25 | (length(wave) > mean(wavelengths) &
-                                    (max(wave[round(0.75*length(wave)):length(wave)]) > 0.8))){                     # If the wave is above average length and the last quarter has a value above 0.8, consider it a second systolic peak
+              (max(wave[round(0.75*length(wave)):length(wave)]) > 0.8))){                     # If the wave is above average length and the last quarter has a value above 0.8, consider it a second systolic peak
       systolic_endings[i] <- i
     }
   }
@@ -1223,7 +1228,8 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
     wave <- pulse[, i]
     for(j in 142:length(wave)){   # look only after w
       if(is.na(pulse[j, i]) == FALSE & is.na(average_wave[j] + 4*sd_wave[j]) == FALSE){
-        if(pulse[j, i] > (average_wave[j] + 4*sd_wave[j]) | pulse[j, i] < (average_wave[j] - 4*sd_wave[j])){
+        if(pulse[j, i] > (average_wave[j] + 4*sd_wave[j]) |
+           pulse[j, i] < (average_wave[j] - 4*sd_wave[j])){
           breaches[j] <- 1
         }
       }
@@ -2689,7 +2695,8 @@ FixBaseline <- function(new_beat, f = model2.ChiSq3, renal_param, dias_param, sy
                                    beats = list(1, new_beat[j, 3],
                                                 new_beat[j, 4]), beat = NULL, a = NULL,
                                    plot = FALSE, renal_param = renal_param,
-                                   dias_param = dias_param, sys_time = sys_time[j], w = w[j])
+                                   dias_param = dias_param,
+                                   sys_time = sys_time[j], w = w[j])
       if(wave_check2 < wave_check){                                                      # If equal values give a better fit, fix them to be so
         new_beat[j, 6] <- new_beat[j, 5]
       }
@@ -2722,8 +2729,8 @@ PlotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.R
     rm(seg)
     temp <- model2.Rebuild2(data, yPrev, as.double(beat2[i,]),TRUE)            # Generate the fitted wave from parameter outputs
     plot(data[, 1], data[, 2], ylim = c(beat2$Baseline[1]*1.5,                 # Plot both original data wave and fitted wave
-                                        max(data[, 2]*1.2)), main = paste(c("batch",
-                                                                            k, "wave", i), collapse = " "))
+            max(data[, 2]*1.2)), main = paste(c("batch",
+            k, "wave", i), collapse = " "))
     lines(data[,1],temp)
     lines(c(xPrev, (beat2[i, 3]  + (1*beat2[i, 6]))), rep(beat2[i, 1], 2))     # Plot baselines
     lines(c((beat2[i, 3]  + (1*beat2[i, 6])), xNext), rep(beat2[i, 2], 2))
@@ -2839,8 +2846,8 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
                   aes(x = x, y = values, col = Wave)) +
         geom_line(aes(size = Wave, alpha = Wave)) +
         scale_color_manual(values = c("#03fc7b",
-                                      "#03b5fc", "black", "black", "black", "#ff4242",
-                                      "black")) +
+        "#03b5fc", "black", "black", "black", "#ff4242",
+        "black")) +
         scale_size_manual(values = c(0.7, 0.7, 1.5, 0.7, 0.7)) +
         scale_alpha_manual(values = c(1, 1, 1, 1, 1)) +
         ylab("PPG Signal") + xlab("Time") +
@@ -3285,7 +3292,7 @@ model2.ChiSq4 <- function(data, params, debug=FALSE, beats, beat, a = NULL, plot
     NRMSE[i] <- NRMSE.
 
     aNRMSE[i] <- (sum(residue_roi^2) / sum(dat[ind_resid, 2]^2))*100           # Calculate alternative NRMSE method (Wang et al 2013) (SSE / Sum of squared datapoints)
-    # Optional plotting: # plot(dat[ind_resid, 1], dat[ind_resid, 2]^2, type = "l")  # lines(dat[ind_resid, 1], residue_roi^2, col = "red")
+                                                                               # Optional plotting: # plot(dat[ind_resid, 1], dat[ind_resid, 2]^2, type = "l")  # lines(dat[ind_resid, 1], residue_roi^2, col = "red")
 
     residue[w.:end[1]] <-  residue[w.:end[1]]*3                                # Weighted region is W -> D (with slope)
     if(length(residue) > end[1]){
@@ -3469,10 +3476,9 @@ model2.FIX_PAR3 <- function(time, within_beat_params, across_beat_params, debug=
   MAX_WIDTH <- c(0.5, 0.45, 0.25)                                              # Define the constaints for (maximum) width, for each of the three component waves
 
   p <- 1:12*0                                                                  # Define also a penalty vector, each value corresponding to 1 of the 12 parameters as follows:
-  # p: { #, #, t[1], h[1], w[1], t[2], h[2], w[2], t[3], h[3], w[3], across_beat_params[6] }
+                                                                               # p: { #, #, t[1], h[1], w[1], t[2], h[2], w[2], t[3], h[3], w[3], across_beat_params[6] }
 
-
-  # Penalizing and fixing of component wave parameter values (amplitude and width):
+                                                                               # Penalizing and fixing of component wave parameter values (amplitude and width):
 
   for(i in 1:3){                                                               # For each component wave, penalize and fix amplitudes below 0
     if (h[i] < 0){
@@ -3498,8 +3504,7 @@ model2.FIX_PAR3 <- function(time, within_beat_params, across_beat_params, debug=
     }
   }
 
-  # Penalizing and fixing of component wave parameter values (timing):
-
+                                                                               # Penalizing and fixing of component wave parameter values (timing):
 
   fixed <- max((sys_t - 0.04) , min( t[1], (sys_t + 0.04 )))                   # Penalise and fix systolic waves occuring outside of 40ms of the peak of the ppg data segment
   if (debug){
@@ -3543,7 +3548,7 @@ model2.FIX_PAR3 <- function(time, within_beat_params, across_beat_params, debug=
     t[3] <- renal_param
   }
 
-  # Penalizing and fixing of decay element parameters:
+                                                                               # Penalizing and fixing of decay element parameters:
 
   if(across_beat_params[6] > 0.95){                                            # Penalise and fix the decay rate parameter if > 0.95 (indicating less than 5% decay over the time interval of a single data point)
     diff <- across_beat_params[6] - 0.95
@@ -3665,9 +3670,9 @@ simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, 
   if(debug){print(paste("Root chi-squared:",chiSq[1]))}
 
   result <- matrix(nrow=nPar+1,ncol=nPar)                                      # Create a matrix to be outputted by the function, with as many columns as parameters, and
-  # the same number of rows + 1 (row 1 will be the initially estimated parameters, whilst all
-  # other rows will represent parameter sets where all parameters remain the same as row 1 with
-  # the exception of one paramter that is refined as per the below procedure.
+                                                                               # the same number of rows + 1 (row 1 will be the initially estimated parameters, whilst all
+                                                                               # other rows will represent parameter sets where all parameters remain the same as row 1 with
+                                                                               # the exception of one paramter that is refined as per the below procedure.
 
   result[1,] <- as.double(param)                                               # Fill the first row with the inputted parameters
 
@@ -3797,7 +3802,7 @@ simplex.MakeSimplex2 <- function(data,param,f,inScale,directions=NULL,inTol=-1, 
 
     if(debug){ print(paste("Param[",i,"] =",tParam[i]))}
     result[i+1,] = as.double(tParam)                                           # The value of the ith parameter providing the best goodness of fit (with all other parameters
-    # held constant) defines a unique parameter set that become the (i+1)th row in the output matrix
+                                                                               # held constant) defines a unique parameter set that become the (i+1)th row in the output matrix
   }
 
   if (debug){ print("/MakeSimplex") }
@@ -3906,7 +3911,7 @@ simplex.MakeSimplex3 <- function(ppg, param,f,inScale, directions=NULL, inTol=-1
 
     tParam <- param + delta                                                    # Redefine the test parameters by this time adding rather than subtracting the delta value
 
-    chiSq[i+1] <- f(data = ppg, params = tParam,                              # Calculate the goodness of fit of the test parameters when the delta increment is added
+    chiSq[i+1] <- f(data = ppg, params = tParam,                               # Calculate the goodness of fit of the test parameters when the delta increment is added
                     beats = beat_vector,
                     renal_param = renal_param,
                     dias_param = dias_param,
@@ -3920,13 +3925,13 @@ simplex.MakeSimplex3 <- function(ppg, param,f,inScale, directions=NULL, inTol=-1
       print("---")
     }
 
-    if (chiSqMinus < chiSq[i+1]){                                             # If subtracting delta yields a better goodness of fit than adding delta,
-      delta <- -delta                                                         # then invert delta, redefine the test parameters to have delta subtracted,
-      tParam <- param + delta                                                 # and define the goodness of fit as the lower ChiSq value. The direction in
-      chiSq[i+1] <- chiSqMinus                                                # which to the refine the ith parameter value (increase or decrease) is now decided.
+    if (chiSqMinus < chiSq[i+1]){                                              # If subtracting delta yields a better goodness of fit than adding delta,
+      delta <- -delta                                                          # then invert delta, redefine the test parameters to have delta subtracted,
+      tParam <- param + delta                                                  # and define the goodness of fit as the lower ChiSq value. The direction in
+      chiSq[i+1] <- chiSqMinus                                                 # which to the refine the ith parameter value (increase or decrease) is now decided.
     }
 
-    iKill <- 10                                                               # Define the number of iterations that a given parameter will be refined over
+    iKill <- 10                                                                # Define the number of iterations that a given parameter will be refined over
 
 
     if (chiSq[i+1] < chiSq[1]){                                                # If the new fit is better than the old fit (with no parameters changed),
@@ -4055,7 +4060,7 @@ simplex.Run2 <- function(data = ppg,simplexParam = mat, f = model2.ChiSq3, optio
     nHigh <- extrema[2]
     high <- extrema[3]
 
-    if(!is.null(run)){                                                          # Print run number and iteration number
+    if(!is.null(run)){                                                         # Print run number and iteration number
       print(run)
     }
     print(iStep)
