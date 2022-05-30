@@ -621,7 +621,7 @@ clean_wuv <- function(wuv, sp, inx, o, samp, bc, q = FALSE){
   ########################################################################################################################################
 
   o2 <- o                                                                                     # Define a second vector for O from which
-  # rejected waves are to be removed
+                                                                                              # rejected waves are to be removed
 
   falseU <- c()                                                                               # Identify U values that are implausibly far
   for(i in 1:(nrow(wuv)-1)){                                                                  # from baseline
