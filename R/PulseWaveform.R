@@ -1273,7 +1273,7 @@ sep_beats <- function(odiff, bc, samp, wuv, wvlen, inx, o, ibi, scale = TRUE, q 
 
   average_wave <- find_average(p = pulse, ao = afterO)                                        # Final recalculation of the average waveform
 
-  cat(nrow(wuv), "beats carried over for 2mg subsetting (post-cleaning)")                     # Print number of beats post subsetting and cleaning
+  cat(nrow(wuv), "beats carried over for 2mg subsetting (post-cleaning)")                     # Print number of beats post subsetting and cleaning (only informative for ISO analysis)
 
   rejects <- list(extra_long_wave, extra_short_waves, double_segments,                        # Save rejected waves
                   systolic_endings, drops_below_o, hrsd_waves, outlier_waves)
