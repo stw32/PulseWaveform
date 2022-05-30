@@ -74,6 +74,32 @@ n <- dim(ppg)[1]                                                                
 vpg <- ppg[2:n,2] - ppg[1:(n-1),2]                                                                 # y-axis value above which all inflection points should be peaks, then set pk_thrshd to this value)
 beat <- data.frame(ppg[which(vpg[1:(n-1)] < pk_thrshd & vpg[2:n] >= pk_thrshd),1])
 rm(vpg)
+undetrended <- ppg[, 2]
+
+###################################################################################
+
+#                 Pipeline: Extraction of Spectral Features                       #
+
+###################################################################################
+
+
+plot((1:length(undetrended))/samplingRate, undetrended, t = "l")
+N <- length(undetrended)
+xPer <- (1/N)*abs(fft(undetrended)^2)
+f <- seq(0,1.0-1/N,by=1/N)
+f <- f*samplingRate
+spectrum <- data.frame(f, xPer)
+point04 <- which(abs(f - 0.04) == min(abs(f - 0.04)))
+point08 <- which(abs(f - 0.08) == min(abs(f - 0.08)))
+point145 <- which(abs(f - 0.145) == min(abs(f - 0.145)))
+point45 <- which(abs(f - 0.45) == min(abs(f - 0.45)))
+total_power <- sum(spectrum[point04:point45, 2])
+LFNU <- sum(spectrum[point04:point145, 2]) / total_power
+MFNU <- sum(spectrum[point08:point145, 2]) / total_power
+HFNU <- sum(spectrum[point145:point45, 2]) / total_power
+LFHF_ratio <- LFNU / HFNU
+spectrum[c(which(1:nrow(spectrum) < point04)), ] <- 0
+plot(spectrum, t = "l", xlim = c(0.04, 1.5), ylim = c(0, max(spectrum$xPer)))
 
 
 ###################################################################################
