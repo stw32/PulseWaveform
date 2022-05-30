@@ -11,7 +11,7 @@ const.pi = 3.1415926535897932384626433
 # 4. find_o
 # 5. preclean_wuv
 # 6. Baseline
-# 7. Clean_wuv
+# 7. clean_wuv
 # 8. sep_beats
 # 9. find_average
 # 10. find_sd
