@@ -1625,23 +1625,28 @@ osnd_of_average <- function(aw, dp, diff, sr, plot = TRUE){
   # points(new.n, predict(d1WavPoly, new.n))
 
   if(sum(which(wavInflxX < new.n)) < 1){                                                                     # If there are no inflection points before new.n, assume it is
-    new.n <- wavInflxX[min(which(wavInflxX > new.n & wavInflxY < new.ny))]                                   # incorrect and move to the next inflection point that has a lower y-value than it
-    new.ny <- predict(avWavPoly, new.n)
-  }
-
-  if(length(wavInflxX) > 1 & wavInflxY[max(which(wavInflxX < new.n))] < new.ny){                             # After having found the notch on all waves, see if there are inflexion points either side
-    new.n <- wavInflxX[max(which(wavInflxX < new.n))]                                                        # If inflexion point before is lower and inflexion point after is higher (on y axis), this must mean a second peak aka a canonical / class 1 wave
-    new.ny <-  predict(avWavPoly, new.n)                                                                     # Thus if this criterion is fulfilled, consider N and D as distinct.
-
-    if(sum(wavInflxX > new.n) > 0){                                                                          # Take the inflection point after the notch as the D peak.
-      d. <- wavInflxX[min(which(wavInflxX > new.n))]                                                         # If there is no inflection point after the notch, take instead the next inflection point on deriv1
-      d.y <- predict(avWavPoly, d.)
-    }else{
-      d. <- d1InflxX[min(which(d1InflxX > new.n))]
-      d.y <- predict(avWavPoly, d.)
+    if (sum(which(wavInflxX > new.n & wavInflxY < new.ny)) > 1){                                             # incorrect and move to the next inflection point that has a lower y-value than it
+      new.n <- wavInflxX[min(which(wavInflxX > new.n & wavInflxY < new.ny))]                                 # If, however, there are no inflection points that fit this criterion, keep N as it is.
+      new.ny <- predict(avWavPoly, new.n)
     }
-    switch <- 1
   }
+
+  if (sum(which(wavInflxX < new.n)) > 0){
+    if(length(wavInflxX) > 1 & wavInflxY[max(which(wavInflxX < new.n))] < new.ny){                           # After having found the notch on all waves, see if there are inflexion points either side
+      new.n <- wavInflxX[max(which(wavInflxX < new.n))]                                                      # If inflexion point before is lower and inflexion point after is higher (on y axis), this must mean a second peak aka a canonical / class 1 wave
+      new.ny <-  predict(avWavPoly, new.n)                                                                   # Thus if this criterion is fulfilled, consider N and D as distinct.
+
+      if(sum(wavInflxX > new.n) > 0){                                                                        # Take the inflection point after the notch as the D peak.
+        d. <- wavInflxX[min(which(wavInflxX > new.n))]                                                       # If there is no inflection point after the notch, take instead the next inflection point on deriv1
+        d.y <- predict(avWavPoly, d.)
+      }else{
+        d. <- d1InflxX[min(which(d1InflxX > new.n))]
+        d.y <- predict(avWavPoly, d.)
+      }
+      switch <- 1
+    }
+  }
+
 
   if(plot == TRUE){
     plot(avWavPoly)
