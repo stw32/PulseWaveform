@@ -164,11 +164,11 @@ find_w <- function(d1p, deriv1, sp, sr, pk_thrshd){
     std <- sd(d1InflxY[1:(1+a)])
 
     if(length(windowPks) == 2){                                                                                                                 # If two peaks are found, confirm that they are both significantly higher than surrounding
-      if(windowPksY[1] > (m + (1.5*std)) & windowPksY[1] > pk_thrshd*5){                                                                        # inflection points, and that the second peak is greater than half the height of the first
+      if(windowPksY[1] > (m + (1.5*std)) & windowPksY[1] > pk_thrshd){                                                                          # inflection points, and that the second peak is greater than half the height of the first
         wX[1] <-  windowPks[1]                                                                                                                  # peak (unless the first peak is an artefact).
         if(windowPksY[2] > (m + (1.5*std)) &
            windowPksY[2] > (windowPksY[1]/2) | windowPksY[1] > (mean(deriv1) + (5*std(deriv1))) &
-           windowPksY[2] < pk_thrshd*5){
+           windowPksY[2] < pk_thrshd){
           wX[2] <-  windowPks[2]
         }
       }
