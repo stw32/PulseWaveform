@@ -80,3 +80,4 @@ temp <- model2.FIX_PAR3(time = data[, 1],
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

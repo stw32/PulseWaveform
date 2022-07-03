@@ -94,3 +94,4 @@ across_params <- simplex.MakeSimplex2(data=ppg, param = par, f = model2.ChiSq3,
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

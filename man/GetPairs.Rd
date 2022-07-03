@@ -63,3 +63,4 @@ pairs <- GetPairs(direc = direc[1], run_order, participant_number = run, subject
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

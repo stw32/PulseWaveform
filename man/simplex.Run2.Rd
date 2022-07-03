@@ -85,3 +85,4 @@ sim <- simplex.Run2(data = ppg, simplexParam = mat, f = model2.ChiSq3, optional=
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

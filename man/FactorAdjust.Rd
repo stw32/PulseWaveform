@@ -95,6 +95,7 @@ FactorAdjust(data, factorCutoff, ppg, u, beat, a., test, gs=gs, beatTime, nextTi
 }
 \examples{
 FactorAdjust(data, factorCutoff, ppg, u, beat, a., test, gs=gs, beatTime, nextTime, plot = T)
+}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory (show via RShowDoc("KEYWORDS")):
 % \keyword{ ~kwd1 }

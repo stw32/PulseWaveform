@@ -74,3 +74,4 @@ GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, r
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

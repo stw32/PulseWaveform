@@ -98,3 +98,4 @@ within_params <- FindWithinParams(beats_in, ppg, beat = new_beat, gs = model2.Ge
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

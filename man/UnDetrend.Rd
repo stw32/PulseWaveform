@@ -60,3 +60,4 @@ ppg[,2] = UnDetrend(ppg,factor=factor_value,offset=offset_value)
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

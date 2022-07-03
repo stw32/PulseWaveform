@@ -67,3 +67,4 @@ OffsetAdjust(ppg3, ppg, u = UnDetrend, factor_value, plot = F)
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

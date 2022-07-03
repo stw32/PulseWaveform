@@ -56,3 +56,4 @@ result <- result + model2.Peak(xy[,1],params[3:5])
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

@@ -58,3 +58,4 @@ residue <- e(data[,2], ppg[seg[1]-1,2], -0)
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

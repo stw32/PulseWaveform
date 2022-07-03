@@ -68,3 +68,4 @@ baseCor <- baseline(inx = inflexX, iny = inflexY, o = o_orig,
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

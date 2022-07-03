@@ -72,3 +72,4 @@ temp <- ArrangeOutputs(beat_final, beat_orig, features, pulse, fit_check, ps, pr
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

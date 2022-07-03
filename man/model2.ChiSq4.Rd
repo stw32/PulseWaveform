@@ -90,3 +90,4 @@ fit_check[[k]] <- model2.ChiSq4(data = ppg, params = NULL, beats = beat_vector,
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

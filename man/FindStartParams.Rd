@@ -92,3 +92,4 @@ temp <- FindStartParams(batch_number, beats_in, beat, ppg, gs = model2.GetSegmen
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

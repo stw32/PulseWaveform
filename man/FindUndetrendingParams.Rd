@@ -85,3 +85,4 @@ temp <- FindUndetrendingParams(direc = direc[1], gs = model2.GetSegment, oa = Of
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

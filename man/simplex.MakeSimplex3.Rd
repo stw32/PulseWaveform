@@ -92,3 +92,4 @@ simplex.MakeSimplex3 is for non-fixed (within beat) parameters only. Thus the ou
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

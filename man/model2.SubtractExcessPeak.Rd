@@ -58,3 +58,4 @@ residue <- sep(data[,1],residue,par[8:10])
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}

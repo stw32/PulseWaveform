@@ -69,3 +69,4 @@ new_beat <- FixBaseline(new_beat, f = model2.ChiSq4, renal_param, dias_param, sy
 % \concept{ ~cpt1 }
 % \concept{ ~cpt2 }
 % Use only one concept per line.
+}
