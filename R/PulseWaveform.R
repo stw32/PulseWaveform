@@ -132,7 +132,6 @@ find_w <- function(d1p, deriv1, sp, sr, pk_thrshd){
   while(length(wX) < 2){                                                                                                                        # and widen until two peaks are identified within the window
 
     firstWindow <- data.frame(d1InflxX[1]:d1InflxX[1+a], deriv1[d1InflxX[1]:d1InflxX[1+a]])                                                     # Create window
-    plot(firstWindow)
     windowInflxY <- d1InflxY[which(d1InflxX > firstWindow[1, 1] & d1InflxX < firstWindow[, 1][length(firstWindow[, 1])])]                       # Find the inflection points which fall within the window
     windowInflxX <- d1InflxX[which(d1InflxX > firstWindow[1, 1]  & d1InflxX < firstWindow[, 1][length(firstWindow[, 1])])]
     threshold <- quantile(firstWindow[, 2], probs=c(.95))                                                                                       # Define a threshold for finding peaks, of 0.95
