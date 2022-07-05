@@ -2764,7 +2764,7 @@ PlotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.R
 }
 
 
-GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F){
+GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F, iso = F){
   ##################################################################################################################
   # GGplotFits produces GGplot plots of each modelled waveform in the batch, including component waves and baselines.
 
@@ -2777,6 +2777,7 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
   # run (participant number)
   # pr (dose level)
   # p (logical, setting to true stores the plot as a variable)
+  # iso (set to true if ISO analysis specific (default is F))
 
   # Output:
   # Automated plotting of each fitted waveform in the batch
@@ -2872,8 +2873,10 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
               panel.background = element_blank(),
               axis.line = element_line(colour = "black")) +
         theme(legend.position = "none") +
-        ggtitle(paste0("Participant", " ", run, "\n", pr,
+        if(iso == T){
+          ggtitle(paste0("Participant", " ", run, "\n", pr,
                        " ", "mcg", sep = ""))
+        }
     }else{
       ggplot(data = waves_stacked_final, aes(x = x, y = values,
                                              col = Wave)) +
