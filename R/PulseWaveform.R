@@ -2876,7 +2876,9 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
         if(iso == T){
           ggtitle(paste0("Participant", " ", run, "\n", pr,
                        " ", "mcg", sep = ""))
-        }
+        }else{ggtitle(paste0(c("batch",
+                               k, "wave", i), collapse = " "))}
+
     }else{
       ggplot(data = waves_stacked_final, aes(x = x, y = values,
                                              col = Wave)) +
