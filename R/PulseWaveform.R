@@ -2784,6 +2784,7 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
   ###################################################################################################################
   if(pr == 1){pr = 0}
 
+  output.plot <- list()
   for(i in 1:beats_in){
     seg <- c(beat[i,3],0,beat[i,4])                                            # Generate each fitted wave and the original
     data <- model2.GetSegment(ppg,seg)
@@ -2854,7 +2855,7 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
     colnames(data_stacked) <- c("x", "values", "Wave")
 
     if(p == T){                                                                # Plot
-      c <- ggplot(data = waves_stacked_final,
+      output.plot[[i]] <- ggplot(data = waves_stacked_final,
                   aes(x = x, y = values, col = Wave)) +
         geom_line(aes(size = Wave, alpha = Wave)) +
         scale_color_manual(values = c("#03fc7b",
@@ -2878,7 +2879,7 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
                        " ", "mcg", sep = ""))
         }else{ggtitle(paste0(c("batch",
                                k, "wave", i), collapse = " "))}
-      return(c)
+      print(output.plot[[i]])
 
     }else{
       ggplot(data = waves_stacked_final, aes(x = x, y = values,
