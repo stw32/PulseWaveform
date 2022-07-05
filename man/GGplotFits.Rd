@@ -8,7 +8,7 @@ GGplotFits
 GGplotFits produces GGplot plots of each modelled waveform in the batch, including component waves and baselines.
 }
 \usage{
-GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F)
+GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F, iso = F)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -35,6 +35,9 @@ dose level
 }
   \item{p}{
 logical, setting to true stores the plot as a variable
+}
+  \item{iso}{
+logical, set to true if ISO analysis specific (default is F)
 }
 }
 \details{
@@ -64,7 +67,7 @@ Automated plotting of each fitted waveform in the batch
 %% ~~objects to See Also as \code{\link{help}}, ~~~
 }
 \examples{
-GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F)
+GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2, run, pr, p = F, iso = F)
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory (show via RShowDoc("KEYWORDS")):
 % \keyword{ ~kwd1 }

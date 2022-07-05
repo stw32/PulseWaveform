@@ -2777,7 +2777,7 @@ GGplotFits <- function(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2
   # run (participant number)
   # pr (dose level)
   # p (logical, setting to true stores the plot as a variable)
-  # iso (set to true if ISO analysis specific (default is F))
+  # iso (logical, set to true if ISO analysis specific (default is F))
 
   # Output:
   # Automated plotting of each fitted waveform in the batch
