@@ -1,0 +1,531 @@
+---
+title: "PulseWaveform Tutorial"
+author: "Simon Williamson"
+date: "06/07/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This tutorial will use an example PPG time series to demonstrate the PulseWaveform pipeline for PPG feature extraction and running of the Hybrid Excess and Decay (HED) model (see the [ReadMe](https://github.com/stw32/PulseWaveform) for an introduction to the model and pipeline). The sample data is a two-minute segment of raw data outputted by a BioRadio device at 75 Hz, recorded during rest. 
+
+# Initial setup
+
+### Install PulseWaveform
+
+If not done so already, install the PulseWaveform package with:
+
+```{r results="hide", message=FALSE}
+devtools::install_github(repo = 'stw32/PulseWaveform')
+```
+
+### Load required packages:
+
+These packages may need to be installed first.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(splines2)
+library(pracma)
+library(SplinesUtils)
+library(spectral)
+library(DescTools)
+library(zoo)
+library(readr)
+library(PulseWaveform)
+```
+
+### Select starting parameters
+
+In this case we know the sampling rate of Bioradio data (75 hz), and that most primary (but not secondary) PPG peaks in the first derivative are above 0.8 on the y-axis (this is important for proper peak detection). We also wish to visualise the segmented waveforms, and how the extracted fiducial points 'OSND' vary across the sample (both plotting parameters are therefore set to true):
+
+```{r}
+samplingRate <- 75                
+pk_thrshd <- 0.8                    
+plot_aligned_waves <- TRUE      
+plot_osnd <- TRUE    
+```
+
+Following this we will select parameters for running the model. For this tutorial we will run the model with the recommended number of simplex iterations (20000). If all beats in the sample are to be modelled (recommended as default), 'all_beats' should be set to FALSE. For the purposes of this example we will run only a subset as defined by the 'batch_number' and 'beats_in' parameters. 
+
+'beats_in' defines the number of beats to be optimised with some shared parameters (see [ReadMe](https://github.com/stw32/PulseWaveform)). It is effectively a way to alter the trade-off between consistency of model fits (and therefore robustness) vs goodness of fit. In this case we will set it to 2, meaning that beats will be modelled in groups of two with shared parameters within pairs. 'batch_number' defines the number of groups of beats to model. We will set it to 6 here, meaning that 6x2 (12) waves will be modelled in total. 
+
+```{r}
+run_hed <- TRUE                     
+simplex_iterations <- 20000        
+all_beats <- FALSE                   
+batch_number <- 6                 
+beats_in <- 2                    
+```
+
+### Download sample data
+
+Download the sample data to a temporary directory and then load into R:
+
+```{r}
+tmpDir = tempdir(check = TRUE)
+download.file("https://github.com/stw32/PulseWaveform/blob/main/Example%20Data/example_PPG_time_series.csv?raw=true", 
+              destfile = file.path(tmpDir, "sample_data.csv"))
+data <- read.csv(file.path(tmpDir, "sample_data.csv"), header = T)
+```
+
+### Define output folder
+
+Next we define the output folder for all extracted features and segmented waveforms the pipeline will generate:
+
+```{r}
+AllOutputs <- list()   
+```
+
+
+# Preprocessing
+
+First duplicates are removed from the data, and the undetrending algorithm inherent to Bioradio hardware is reversed. The raw data is assigned to a dataframe 'ppg', and an initial attempt at detecting peaks in the first derivative is made (to be refined later). 
+
+```{r}
+undetrended_data <- data.frame(preproc(dat=data))                                                  
+
+
+ppg <- undetrended_data                                                                          
+ppg <- data.frame(
+  time = (0:(nrow(ppg)-1)) / samplingRate,
+  ppg = ppg[,1]
+)
+names(ppg)[1] <- "time (s)"
+names(ppg)[2] <- "Detrended"
+
+
+n <- dim(ppg)[1]                                                                                   
+vpg <- ppg[2:n,2] - ppg[1:(n-1),2]                                                       
+beat <- data.frame(ppg[which(vpg[1:(n-1)] < pk_thrshd & vpg[2:n] >= pk_thrshd),1])
+rm(vpg)
+undetrended <- ppg[, 2]
+```
+
+The preprocessed time series can now be visualised:
+
+```{r}
+plot((1:length(undetrended))/samplingRate, undetrended, t = "l", xlab = "Time (seconds)", ylab = "PPG (a.u.)")
+```
+
+
+# Extract Spectral Features
+
+If desired, frequency domain features can be extracted from the PPG time series at this point. These include low, medium and high frequency band powers (relative to total power), as well as low to high frequency ratio. Frequency bands are defined according to [Lee et al, 2011](https://pubmed.ncbi.nlm.nih.gov/21693795/). 
+
+
+
+```{r}
+N <- length(undetrended)
+xPer <- (1/N)*abs(fft(undetrended)^2)
+f <- seq(0,1.0-1/N,by=1/N)
+f <- f*samplingRate
+spectrum <- data.frame(f, xPer)
+point04 <- which(abs(f - 0.04) == min(abs(f - 0.04)))
+point08 <- which(abs(f - 0.08) == min(abs(f - 0.08)))
+point145 <- which(abs(f - 0.145) == min(abs(f - 0.145)))
+point45 <- which(abs(f - 0.45) == min(abs(f - 0.45)))
+total_power <- sum(spectrum[point04:point45, 2])
+LFNU <- sum(spectrum[point04:point145, 2]) / total_power
+MFNU <- sum(spectrum[point08:point145, 2]) / total_power
+HFNU <- sum(spectrum[point145:point45, 2]) / total_power
+LFHF_ratio <- LFNU / HFNU
+spectrum[c(which(1:nrow(spectrum) < point04)), ] <- 0
+spectral_features <- list(LFNU, MFNU, HFNU, LFHF_ratio)
+plot(spectrum, t = "l", xlim = c(0.04, 1.5), ylim = c(0, max(spectrum$xPer)), xlab = "frequency", ylab = "power")
+print(LFHF_ratio)
+```
+
+# Beat Segmentation
+
+In this section, peaks in the time series are formally identified and used as the basis for segmentation of the time series into individual waveforms. 
+
+### Peak Detection
+
+```{r results="hide"}
+undetrended <- ppg[, 2]
+sfunction <- splinefun(1:length(undetrended), undetrended, method = "natural")
+deriv1 <- sfunction(seq(1, length(undetrended)), deriv = 1)
+spline1 <-  sfunction(seq(1, length(undetrended)), deriv = 0)
+splinePoly <- CubicInterpSplineAsPiecePoly(1:length(undetrended), undetrended, "natural")
+deriv1Poly <- CubicInterpSplineAsPiecePoly(1:length(undetrended), deriv1, "natural")
+inflexX <- solve(splinePoly, b = 0, deriv = 1)
+inflexY <- predict(splinePoly, inflexX)
+w <- find_w(d1p = deriv1Poly, deriv1 = deriv1, sp = splinePoly, sr = samplingRate, pk_thrshd = pk_thrshd) 
+```
+
+The identified peaks can then be visualised as found in the first derivative of the time series:
+
+```{r}
+plot(deriv1, t = "l", ylab = "PPG first derivative")
+points(w$wX, w$wYD1, col = "red")
+```
+
+Note also the y-axis of the first derivative. We can see that 0.8 was an appropriate starting parameter for 'pk_thrshd', given all secondary peaks are below this value whilst all primary peaks are above it. When assessing new data, it may be necessary to first run the code up to where the first derivative (deriv1) can be visualised and an appropriate threshold determined. 
+
+### Beat Segmentation and cleaning
+
+The time series is then segmented into individual waveforms. Cleaning steps occur pre and post segmentation. 
+
+```{r results="hide"}
+uv <- find_u_v(wx = w$wX, wy = w$wY, d1 = deriv1, d1p = deriv1Poly,
+               spline = splinePoly, sr = samplingRate, plot=F)
+tmp <- find_o(wx = w$wX, inx = inflexX, iny = inflexY, d1p = deriv1Poly, sp = splinePoly)       
+inflexX <- tmp[[1]]
+inflexY <- tmp[[2]]
+o_orig <- tmp[[3]]
+tmp <- preclean_wuv(w=w, uv=uv, o=o_orig, samp = samplingRate, sp = spline1, q = F)
+w <- tmp[[1]]
+uv <- tmp[[2]]
+o <- tmp[[3]]
+rm(tmp)
+baseCor <- baseline(inx = inflexX, iny = inflexY, o = o_orig,                                 
+                    dat = undetrended, sp = splinePoly, plot=F)
+sfunctionBC <- splinefun(1:length(baseCor), baseCor, method = "natural")
+deriv1BC <- sfunctionBC(seq(1, length(baseCor)), deriv = 1)
+spline1BC <- sfunctionBC(seq(1, length(baseCor)), deriv = 0)
+splinePolyBC <- CubicInterpSplineAsPiecePoly(1:length(baseCor), baseCor, "natural")
+deriv1PolyBC <- CubicInterpSplineAsPiecePoly(1:length(baseCor), deriv1BC, "natural")
+w$wY <- predict(splinePolyBC, w$wX)
+uv$uY <- predict(splinePolyBC, uv$uX)
+uv$vY <- predict(splinePolyBC, uv$vX)
+wuv <- cbind(w, uv)
+tmp <- clean_wuv(wuv = wuv, sp = splinePolyBC, inx = inflexX, o = o,
+                 samp = samplingRate, bc = baseCor, q = F)
+wuv <- tmp[[1]]
+ibi <- tmp[[2]]                                                                                   
+oDiff <- tmp[[3]]
+rm(tmp, w, uv)
+waveLen <- round(median(oDiff)+15)
+ppg[, 2] <- baseCor
+tmp <- sep_beats(odiff = oDiff, bc = baseCor, samp = samplingRate, wuv = wuv, wvlen = waveLen,     
+                 ibi=ibi, o=o_orig, inx = inflexX, scale = T, q = F, subset = FALSE, boundaries)
+avWave <- tmp[[1]]
+pulse <- tmp[[2]]
+wuv <- tmp[[3]]
+rejects <- tmp[[4]]                                                                             
+rm(tmp)
+```
+
+All pulse waveforms can then be aligned and visualised, with the average (mean) waveform overlayed in red:
+
+```{r}
+if(plot_aligned_waves == TRUE){                                                            
+  pulse_stacked <- gather(pulse, key = "wave_ID", value = "values", -c("x"))
+  average <- data.frame(seq((-141/(samplingRate*10)),
+                            ((waveLen*15 -9)-142)/(samplingRate*10),
+                            by = 1/(samplingRate*10)))
+  average <- cbind(average, avWave)
+  colnames(average)[1] <- "x"
+  pl <- ggplot(data = pulse_stacked[-which(is.na(pulse_stacked[, 3])), ],
+               aes(x, values, col = wave_ID), col = "black") +
+    scale_color_manual(values = rep("black", ncol(pulse))) +
+    geom_line(size = 1.5, alpha = ((1/length(wuv$wX)*10)-(1/length(wuv$wX)))) +
+    geom_line(data = average[-which(is.na(average[, 2])), ],
+              aes(x, avWave), size = 1.125, color = "red") +                                     
+    theme(legend.position = "none") + labs( y= "PPG Output", x = "Time (Seconds)") +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+          axis.title = element_blank(),
+          axis.text = element_text(size = 12)) 
+  print(pl)
+}
+```
+
+# The Hybrid Excess and Decay (HED) Model
+
+Prior to running the HED model, starting parameters must be estimated. The starting parameter for 'decay rate' (i.e. config.rate) is defined first. 0.99 is recommended for canonical waveforms, lower values may be required for non-canonical waveforms e.g class 3 or above (for description of classes, see figure 1 of [Tigges et al, 2016](https://www.degruyter.com/document/doi/10.1515/cdbme-2016-0046/html?lang=en)): 
+
+```{r}
+config.rate = 0.99  
+lab.time = "time (s)"
+lab.ppg = "Detrended"
+const.pi = 3.1415926535897932384626433
+```
+
+As the HED model runs it will generate plots of fitted waveforms. It is worth viewing these to assess the overall quality and plausability of fits. For the sake of space, however, we will only plot two here by ensuring the 'GGplotFits' function only runs once. 'PlotFits' (commented out in the code below) can also be used for plotting in base R, and is somewhat less expensive. 
+
+```{r}
+plotfitsgo = TRUE
+```
+
+
+Running HED (this is the most computationally demanding section of the pipeline and may therefore take some time, especially when all waveforms are modelled). 
+
+```{r results="hide"}
+if(run_hed == TRUE){
+  
+  beat <-  ppg[round(inflexX[wuv$o2]), 1]                                                          
+  nBeats <- length(beat)
+  beat <- data.frame(
+    beat = beat,
+    dt = (1:nBeats)*0.0
+  )
+  beat <- AddOutput(beat)
+  if(all_beats == T){
+    batch_number <- floor(nrow(beat)/beats_in)
+    remainder <- nrow(beat) - (batch_number*beats_in)
+  }
+  
+  ppg$Baseline = 1:nrow(ppg) * 0                                                                   
+  ppg$Excess   = 1:nrow(ppg) * 0
+  ppg$Residue  = 1:nrow(ppg) * 0
+  
+  temp <- FindStartParams(batch_number, beats_in, beat, ppg, gs = model2.GetSegment,               
+                          e = model2.Excess, sep = model2.SubtractExcessPeak,
+                          o_points = inflexX[o_orig], wuv = wuv, inflexX = inflexX, all_beats)
+  beat <- temp[[1]]
+  ppg <- temp[[2]]                                                                                 
+  rm(temp)
+  
+  beat_orig <- beat
+  fit_check <- list()
+  for(k in 1:(batch_number+1)){
+    
+    if(all_beats == TRUE){
+      if(k == batch_number+1){
+        if(remainder == 0){break}
+        beat <- beat_orig[(((k-1)*beats_in) + 1 ):(((k-1)*beats_in) + remainder), ]
+        beats_in <- remainder
+        w <- wuv$wX[(((k-1)*beats_in) + 1 ):(((k-1)*beats_in) + remainder)]
+      }else{
+        beat <- beat_orig[((k*beats_in)-(beats_in-1)):(k*beats_in), ]
+        w <- wuv$wX[((k*beats_in)-(beats_in-1)):(k*beats_in)]
+      }
+    }else{
+      if(k == batch_number+1){break}
+      beat <- beat_orig[((k*beats_in)-(beats_in-1)):(k*beats_in), ]
+      w <- wuv$wX[((k*beats_in)-(beats_in-1)):(k*beats_in)]
+    }
+    
+    w <- w / samplingRate
+    renal_param <- median(beat$NTime)
+    dias_param <- median(beat$DTime)
+    sys_time <- beat$STime
+    par <- as.numeric(beat[1,5:16])
+    beat_start <- beat[, 3]
+    beat_end <- beat[, 4]
+    beat_vector <- list(beats_in, beat_start, beat_end)
+    
+    for(i in 1:4){                                                                              
+      if(i == 1){new_beat <- beat}
+      within_params <- FindWithinParams(beats_in, ppg, beat = new_beat, gs = model2.GetSegment,
+                                        fp = model2.FixParams3, ms = simplex.MakeSimplex3,
+                                        m2 = model2.ChiSq3, beat_vector = beat_vector,
+                                        renal_param = renal_param, dias_param = dias_param,
+                                        sys_time = sys_time, w = w)
+      across_params <- simplex.MakeSimplex2(data=ppg, param = par, f = model2.ChiSq3,
+                                            inScale = 0.1, beat_vector = beat_vector,
+                                            beat = new_beat, renal_param = renal_param,
+                                            dias_param = dias_param, sys_time = sys_time, w = w)
+      mat <- make_matrix(across_params, within_params)
+      sim <- simplex.Run2(data = ppg, simplexParam = mat, f = model2.ChiSq3, optional=NULL,
+                          beat_vector = beat_vector, renal_param = renal_param,
+                          dias_param = dias_param, sys_time = sys_time, ms = simplex_iterations,
+                          w = w, run = c("run", i))
+      output <- extractOutput(beats_in, sim)
+      fixed <- FixOutput(beats_in, beat = new_beat, ppg, gs = model2.GetSegment,
+                         fp = model2.FixParams3, across = output[[1]], within = output[[2]],
+                         sys_time = sys_time)
+      new_beat <- UpdateBeat(beats_in, beat, fixed)
+      new_beat <- FixBaseline(new_beat, f = model2.ChiSq4, renal_param, dias_param, sys_time, w)
+    }
+    
+    
+    fit_check[[k]] <- model2.ChiSq4(data = ppg, params = NULL, beats = beat_vector,                
+                                    beat = new_beat, a = sim[1, ], plot = FALSE,
+                                    renal_param = renal_param, dias_param = dias_param,
+                                    sys_time = sys_time, w = w)
+    
+    beat2 <- new_beat                                                                              
+    colnames(beat2) <- colnames(beat)
+    beat2 <- beat2[, -c(1:4)]
+    
+    # PlotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2)                 
+    
+     if (plotfitsgo == T){
+     GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2,         
+     run = 1, pr = 1, p = T, iso = F)
+     plotfitsgo <- FALSE
+     }
+    
+    if(k == 1){beat_final <- beat2}else{beat_final <- rbind(beat_final, beat2)}                    
+    
+  }
+}
+```
+
+
+# Morphological feature extraction
+
+First fiducial points (OSND) are identified on each individual waveform. 
+
+```{r results="hide"}
+polyWave <- list()                                                                                 
+for(i in 2:ncol(pulse)){
+  polyWave[[i-1]] <-CubicInterpSplineAsPiecePoly(pulse$x, pulse[, i], "natural")
+}
+tmp <- diast_pk(avw = avWave, sr = samplingRate, scale = T)
+dPeak <- tmp[1]
+xShift <- tmp[2]
+rm(tmp)
+osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate, plot = F)
+if(dPeak == 5*samplingRate){
+  dPeak <- osnd$x[4]*1.2
+}
+if((osnd$x[4]-osnd$x[3]) < 1.5 & (osnd$x[4]-osnd$x[3]) > 0){
+  dPeak <- dPeak*0.95
+  osnd <- osnd_of_average(avWave, dp = dPeak, diff = 0, sr = samplingRate, plot = FALSE)
+}
+scale <- 1                                                                                         
+osnd_all <- list()
+for(i in 2:ncol(pulse)){
+  wavi <- pulse[, i][!is.na(pulse[, i])]
+  if(scale == 1){
+    xShift2 <- (which(abs(wavi - 0.5) == min(abs(wavi - 0.5))))
+  }else{
+    xShift2 <- which.min(abs(wavi))
+  }
+  diff <- xShift - xShift2
+  dpa <- dPeak - diff
+  osnd_all[[i-1]] <- osnd_of_average(aw = wavi, dp = dpa, diff = diff,
+                                     sr = samplingRate, plot = F)
+}
+```
+
+
+These can then be plotted against the average waveform:
+
+```{r, results = "hide"}
+if(plot_osnd == TRUE){                                                                             
+  plot(avWave[!is.na(avWave)], type = "l", ylab = "PPG signal") + for(i in 1:length(osnd_all)){
+    points(osnd_all[[i]][4, 1], osnd_all[[i]][4, 2], col = "blue")
+    points(osnd_all[[i]][3, 1], osnd_all[[i]][3, 2], col = "red")
+    points(osnd_all[[i]][2, 1], osnd_all[[i]][2, 2])
+    points(osnd_all[[i]][1, 1], osnd_all[[i]][1, 2])
+  }
+}
+```
+
+Then features derived from fiducial points (e.g. augmentation index) can be derived:
+
+```{r results="hide"}
+for(i in 1:length(osnd_all)){                                                                      
+  osnd_all[[i]]$y <- osnd_all[[i]]$y - osnd_all[[i]]$y[1]
+}
+features <- feature_extract(oa = osnd_all, p = pulse, pw = polyWave)
+```
+
+
+# Outputs
+
+Finally, the outputs generated across the pipeline are arranged into the 'AllOutputs' list:
+
+```{r results="hide"}
+if(run_hed == TRUE){
+  beat_final <- cbind(beat_orig[1:nrow(beat_final), 1:4], beat_final)                              
+  osnd_fits <- osnd_fit(beat_final, ppg, plot = F)                                                 
+}
+if(run_hed == FALSE){
+  fit_check <- list(c(1:100), c(1:100), c(1:100))
+  beat_final <- data.frame(1:nrow(features))
+  beat_orig <- data.frame(1:nrow(features))
+  osnd_fits <- list(1:100)
+  }
+temp <- ArrangeOutputs(beat_final, beat_orig, features, pulse, fit_check)
+nBeats <- ncol(pulse) - 1
+AllOutputs <- list(nBeats, ibi, rejects, pulse, polyWave, osnd_all, avWave, osnd, temp[[2]], temp[[1]], temp[[3]], osnd_fits, spectral_features)
+```
+
+The key to the output list is as follows:
+
+```{r}
+# [[1]] == nBeats                         Number of waveforms in sample
+# [[2]] == ibi                            Inter-beat intervals (note pre-interpolation)
+# [[3]] == rejects                        Rejected beats, arranged according to reason for exclusion (see Readme)
+# [[4]] == pulse                          Individual waveforms in the sample (discrete form)
+# [[5]] == polyWave                       Individual waveforms in the sample (polynomial spline form)
+# [[6]] == osnd_all                       OSND points of individual waves
+# [[7]] == avWave                         Average waveform of the sample
+# [[8]] == osnd (of average)              OSND points of the average waveform
+# [[9]] == features                       Morphological features derived from OSND points (see supplementary material)
+# [[10]] == beat_final                    Model parameter Outputs
+# [[11]] == fit_check                     Goodness of fit Measures (ChiSq, Max error, NRMSE, aNRMSE)
+# [[12]] == osnd_fits                     Error values (x and y) in recapitulation of OSND points
+# [[13]] == spectral_features             Spectral features
+```
+
+
+# Exploring Outputs
+
+Once the pipeline has run, outputs can be examined in a number of ways. Below of some examples of visualisations that may be of interest. Outputs that prove to be informative could also be used as the basis for classification models. 
+
+### Interbeat intervals
+
+An interbeat interval time series is shown with the following plot. Note that due to cleaning and removal of waveforms, caution should be taken when interpreting: intervals are not necessarily. Nonetheless, an approximation to heart rate variability across the time series can be extracted by taking the standard deviation of interbeat intervals (akin to SDNN) after removal of outliers. 
+
+
+```{r}
+plot(AllOutputs[[2]], t = "l")
+```
+
+In this plot we see a single outlier value, likely due to an interval between non-consecutive peaks. It should be removed before calculating heart (pulse) rate variability:
+
+```{r}
+ibis <- which(AllOutputs[[2]] < 80)
+sdrr <- sd(ibis)
+print(sdrr)
+```
+
+### Morphological features
+
+Morphological (descriptive / fiducial point) features are outputted as a dataframe.
+
+```{r}
+print(head(AllOutputs[[9]]))
+```
+
+Individual feature time series may show interesting dynamic behaviour across the time series, such as the notch to peak ratio:
+
+```{r}
+plot(AllOutputs[[9]]$np_ratio, t = "l", ylab = "notch to peak ratio")
+```
+
+
+### HED Model Performance
+
+#### Goodness of fit
+
+We can assess goodness of fit across the sample of waveforms by visualising NRMSE values for each fitted waveform. In this case the median NRMSE is 0.89 (2dp). These results tend to be negatively skewed.  
+
+```{r}
+hist(AllOutputs[[11]][[3]], main = "Histogram of NRMSE values", xlab = "NRMSE")
+print(median(AllOutputs[[11]][[3]]))
+```
+
+
+### HED model parameter outputs
+
+Parameter outputs of the HED Model are outputted as a single dataframe:
+
+```{r}
+print(head(AllOutputs[[10]][, -c(1:4)]))
+```
+
+
+# End
+
+This is the end of the tutorial. If there are any questions please do refer to the [ReadMe](https://github.com/stw32/PulseWaveform). To apply the pipeline to your own PPG data, the [general purpose script](https://github.com/stw32/PulseWaveform/blob/main/Scripts/GeneralPurposeScript) containing the code above is available and can be altered as required for multiple time series / individuals / groups. 
+
+
+
+
+### Session Info:
+
+```{r}
+sessionInfo()
+```
+
+
