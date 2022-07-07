@@ -75,6 +75,7 @@ vpg <- ppg[2:n,2] - ppg[1:(n-1),2]                                              
 beat <- data.frame(ppg[which(vpg[1:(n-1)] < pk_thrshd & vpg[2:n] >= pk_thrshd),1])
 rm(vpg)
 undetrended <- ppg[, 2]
+plot((1:length(undetrended))/samplingRate, undetrended, t = "l")
 
 ###################################################################################
 
@@ -83,7 +84,6 @@ undetrended <- ppg[, 2]
 ###################################################################################
 
 
-plot((1:length(undetrended))/samplingRate, undetrended, t = "l")
 N <- length(undetrended)
 xPer <- (1/N)*abs(fft(undetrended)^2)
 f <- seq(0,1.0-1/N,by=1/N)
@@ -100,6 +100,7 @@ HFNU <- sum(spectrum[point145:point45, 2]) / total_power
 LFHF_ratio <- LFNU / HFNU
 spectrum[c(which(1:nrow(spectrum) < point04)), ] <- 0
 plot(spectrum, t = "l", xlim = c(0.04, 1.5), ylim = c(0, max(spectrum$xPer)))
+spectral_features <- list(LFNU, MFNU, HFNU, LFHF_ratio)
 
 
 ###################################################################################
@@ -228,6 +229,7 @@ if(run_hed == TRUE){
         w <- wuv$wX[((k*beats_in)-(beats_in-1)):(k*beats_in)]
       }
     }else{
+      if(k == batch_number+1){break}
       beat <- beat_orig[((k*beats_in)-(beats_in-1)):(k*beats_in), ]
       w <- wuv$wX[((k*beats_in)-(beats_in-1)):(k*beats_in)]
     }
@@ -280,7 +282,7 @@ if(run_hed == TRUE){
 
 
     # GGplotFits(beats_in, ppg, beat2, gs = model2.GetSegment, rb = model2.Rebuild2,               # Plots modelled waves in GGplot form (see main text figures)
-    # run = 1, pr = 1, p = T)
+    # run = 1, pr = 1, p = T, iso = F)
 
     if(k == 1){beat_final <- beat2}else{beat_final <- rbind(beat_final, beat2)}                    # Add model outputs from batch to dataframe containing all model outputs
 
@@ -374,3 +376,4 @@ AllOutputs <- list(nBeats, ibi, rejects, pulse, polyWave, osnd_all, avWave, osnd
 # [[10]] == beat_final                    Model parameter Outputs
 # [[11]] == fit_check                     Goodness of fit Measures (ChiSq, Max error, NRMSE, aNRMSE)
 # [[12]] == osnd_fits                     Error values (x and y) in recapitulation of OSND points
+# [[13]] == spectral_features             Spectral features
