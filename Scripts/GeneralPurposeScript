@@ -358,7 +358,7 @@ if(run_hed == TRUE){
 if(run_hed == FALSE){fit_check <- list(c(1:100), c(1:100), c(1:100))}
 temp <- ArrangeOutputs(beat_final, beat_orig, features, pulse, fit_check)
 nBeats <- ncol(pulse) - 1
-AllOutputs <- list(nBeats, ibi, rejects, pulse, polyWave, osnd_all, avWave, osnd, temp[[2]], temp[[1]], temp[[3]], osnd_fits)
+AllOutputs <- list(nBeats, ibi, rejects, pulse, polyWave, osnd_all, avWave, osnd, temp[[2]], temp[[1]], temp[[3]], osnd_fits, spectral_features)
 
 
 

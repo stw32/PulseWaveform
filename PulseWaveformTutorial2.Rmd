@@ -23,7 +23,7 @@ devtools::install_github(repo = 'stw32/PulseWaveform')
 
 ### Load required packages:
 
-These packages may need to be installed first.
+These packages may need to be installed first. All are available on [CRAN](https://cran.r-project.org) and can be installed with install.packages(), other than SplinesUtils which is available [here](https://github.com/ZheyuanLi/SplinesUtils). 
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
