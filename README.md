@@ -1,4 +1,7 @@
 # PulseWaveform
+
+[![DOI](https://zenodo.org/badge/398586029.svg)](https://zenodo.org/badge/latestdoi/398586029)
+
 An automated pipeline for the extraction of PPG waveform features, including the Hybrid Excess and Decay (HED) model for extraction of component wave features.
 
 # Description
