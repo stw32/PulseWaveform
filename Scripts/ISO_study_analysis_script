@@ -451,7 +451,7 @@ new_tail <- seq(avWave2mg[start_tail], to = avWave2mg[119], length.out = x_diff)
 avWave2mg[(start_tail+1):end_tail] <- new_tail
 # remove the bit after the tail:
 avWave2mg <- avWave2mg[-((251+119):length(avWave2mg))]
-# remove one last pesky point:
+# remove one point:
 avWave2mg <- avWave2mg[-(217+218)]
 # Plot
 average <- data.frame(1:length(avWave2mg))
